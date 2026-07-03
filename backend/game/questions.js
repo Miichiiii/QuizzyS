@@ -1,0 +1,42 @@
+// Fragenkatalog. Manuell editierbar, kein Admin-Panel (laut Spec).
+// Struktur exakt nach Master-Prompt. correctIndex verlaesst NIE den Server vor reveal_answer.
+
+const QUESTIONS = [
+  // ── Tiere ──────────────────────────────────────────────
+  { id: "t1", category: "Tiere", question: "Welches Tier schläft im Stehen?", answers: ["Pferd", "Katze", "Igel", "Frosch"], correctIndex: 0, timeLimit: 15 },
+  { id: "t2", category: "Tiere", question: "Wie viele Herzen hat ein Oktopus?", answers: ["1", "2", "3", "8"], correctIndex: 2, timeLimit: 15 },
+  { id: "t3", category: "Tiere", question: "Welches ist das schnellste Landtier?", answers: ["Löwe", "Gepard", "Antilope", "Strauß"], correctIndex: 1, timeLimit: 15 },
+  { id: "t4", category: "Tiere", question: "Was fressen Pandas hauptsächlich?", answers: ["Fisch", "Eukalyptus", "Bambus", "Insekten"], correctIndex: 2, timeLimit: 15 },
+  { id: "t5", category: "Tiere", question: "Welches Tier kann sein Herz anhalten?", answers: ["Frosch", "Schildkröte", "Krokodil", "Fledermaus"], correctIndex: 0, timeLimit: 15 },
+
+  // ── Erdkunde ───────────────────────────────────────────
+  { id: "e1", category: "Erdkunde", question: "Welcher Fluss fließt durch Düsseldorf?", answers: ["Elbe", "Main", "Rhein", "Donau"], correctIndex: 2, timeLimit: 15 },
+  { id: "e2", category: "Erdkunde", question: "Was ist die Hauptstadt von Australien?", answers: ["Sydney", "Melbourne", "Canberra", "Perth"], correctIndex: 2, timeLimit: 15 },
+  { id: "e3", category: "Erdkunde", question: "Welches Land hat die meisten Einwohner?", answers: ["China", "Indien", "USA", "Indonesien"], correctIndex: 1, timeLimit: 15 },
+  { id: "e4", category: "Erdkunde", question: "Wie viele Kontinente gibt es?", answers: ["5", "6", "7", "8"], correctIndex: 2, timeLimit: 15 },
+  { id: "e5", category: "Erdkunde", question: "Welches Meer liegt zwischen Europa und Afrika?", answers: ["Nordsee", "Mittelmeer", "Rotes Meer", "Schwarzes Meer"], correctIndex: 1, timeLimit: 15 },
+
+  // ── Essen ──────────────────────────────────────────────
+  { id: "f1", category: "Essen", question: "Woraus wird Tofu gemacht?", answers: ["Reis", "Sojabohnen", "Weizen", "Kichererbsen"], correctIndex: 1, timeLimit: 15 },
+  { id: "f2", category: "Essen", question: "Welches Gewürz ist das teuerste der Welt?", answers: ["Vanille", "Safran", "Kardamom", "Trüffel"], correctIndex: 1, timeLimit: 15 },
+  { id: "f3", category: "Essen", question: "Aus welchem Land stammt die Pizza Margherita?", answers: ["Frankreich", "Spanien", "Italien", "Griechenland"], correctIndex: 2, timeLimit: 15 },
+  { id: "f4", category: "Essen", question: "Was ist der Hauptbestandteil von Guacamole?", answers: ["Tomate", "Avocado", "Paprika", "Zucchini"], correctIndex: 1, timeLimit: 15 },
+  { id: "f5", category: "Essen", question: "Welches Getreide steckt klassisch in Bier?", answers: ["Roggen", "Hafer", "Gerste", "Mais"], correctIndex: 2, timeLimit: 15 },
+
+  // ── Wissenschaft ───────────────────────────────────────
+  { id: "w1", category: "Wissenschaft", question: "Was ist das chemische Symbol für Gold?", answers: ["Go", "Gd", "Au", "Ag"], correctIndex: 2, timeLimit: 15 },
+  { id: "w2", category: "Wissenschaft", question: "Wie viele Planeten hat unser Sonnensystem?", answers: ["7", "8", "9", "10"], correctIndex: 1, timeLimit: 15 },
+  { id: "w3", category: "Wissenschaft", question: "Was misst ein Barometer?", answers: ["Temperatur", "Luftdruck", "Feuchtigkeit", "Wind"], correctIndex: 1, timeLimit: 15 },
+  { id: "w4", category: "Wissenschaft", question: "Welches Gas atmen Pflanzen ein?", answers: ["Sauerstoff", "Stickstoff", "CO2", "Wasserstoff"], correctIndex: 2, timeLimit: 15 },
+  { id: "w5", category: "Wissenschaft", question: "Wie schnell ist Licht (ca.)?", answers: ["300.000 km/s", "150.000 km/s", "1 Mio. km/s", "30.000 km/s"], correctIndex: 0, timeLimit: 15 }
+];
+
+function getCategories() {
+  return [...new Set(QUESTIONS.map(q => q.category))];
+}
+
+function getQuestionsForCategory(category) {
+  return QUESTIONS.filter(q => q.category === category);
+}
+
+module.exports = { QUESTIONS, getCategories, getQuestionsForCategory };

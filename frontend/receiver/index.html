@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>QuizCast · TV</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f23; --panel: #1a1a35; --line: #3a3a6a;
+    --white: #fcfcfc; --dim: #7c7ca8;
+    --blue: #3cbcfc; --red: #f83800; --gold: #f8b800; --good: #00a800;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--white); overflow: hidden;
+    font-family: "Press Start 2P", monospace; line-height: 1.7;
+    width: 100vw; height: 100vh;
+  }
+  /* CRT-Scanlines ueber allem */
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 99;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.25) 0 2px, transparent 2px 4px);
+  }
+  .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; }
+  .screen.active { display: flex; }
+  .brand { position: fixed; top: 3vh; left: 3vw; font-size: 1.2vw; color: var(--dim); z-index: 5; }
+  .brand b { color: var(--blue); } .brand i { color: var(--red); font-style: normal; }
+  .blink { animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .blink { animation: none; } }
+
+  /* Lobby: Riesencode als Hero, Arcade-Attract-Screen */
+  #lobbyCode {
+    font-size: 11vw; letter-spacing: .08em; padding-left: .08em; line-height: 1;
+    color: var(--gold); text-shadow: .8vw .8vw 0 #5a3a00;
+  }
+  .lobbyHint { font-size: 1.4vw; color: var(--dim); margin-top: 4vh; }
+  .lobbyHint span { color: var(--white); }
+  .lobbySlots { display: flex; gap: 3vw; margin-top: 6vh; }
+  .lslot { border: .4vw dashed var(--line); padding: 2.5vh 3vw; font-size: 1.5vw; color: var(--dim); }
+  .lslot.filled.blau { border: .4vw solid var(--blue); color: var(--blue); background: #0a2038; }
+  .lslot.filled.rot  { border: .4vw solid var(--red);  color: var(--red);  background: #300800; }
+
+  /* Frage: Duell-Layout mit Blau/Rot-Spine */
+  #s-question { justify-content: flex-start; padding: 7vh 6vw; align-items: stretch; }
+  .spine { display: flex; align-items: center; gap: 1.5vw; margin-bottom: 5vh; }
+  .spine .bar { flex: 1; height: 1.4vh; }
+  /* Pixel-Streifen statt glatter Balken */
+  .spine .bar.b { background: repeating-linear-gradient(90deg, var(--blue) 0 1vw, #1a5a80 1vw 1.4vw); opacity: .5; }
+  .spine .bar.r { background: repeating-linear-gradient(90deg, var(--red) 0 1vw, #801c00 1vw 1.4vw); opacity: .5; }
+  .spine .bar.locked { opacity: 1; }
+  #tvTimer {
+    font-size: 3vw; min-width: 9vw; text-align: center;
+    background: var(--panel); padding: 1.4vh 0;
+    border: .35vw solid var(--line); color: var(--white);
+  }
+  #tvTimer.hot { color: var(--red); border-color: var(--red); animation: blink .5s steps(1) infinite; }
+  #tvQmeta { font-size: 1.2vw; color: var(--dim); text-transform: uppercase; }
+  #tvQuestion { font-size: 2.8vw; line-height: 1.8; margin: 2.5vh 0 5vh; }
+  .tvAnswers { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5vh 2vw; }
+  .tvAnswers .a {
+    background: var(--panel); border: .35vw solid var(--line);
+    padding: 3vh 2vw; font-size: 1.7vw; line-height: 1.7;
+    display: flex; gap: 1.5vw; align-items: center;
+    box-shadow: .5vw .5vw 0 #000;
+  }
+  .tvAnswers .a .idx { color: var(--dim); font-size: 1.4vw; }
+  .tvAnswers .a.correct { border-color: var(--good); background: #002800; box-shadow: .5vw .5vw 0 #001400; }
+  .tvAnswers .a.correct .idx { color: var(--good); }
+  .tvAnswers .a.faded { opacity: .3; }
+  .lockinfo { margin-top: 5vh; display: flex; gap: 4vw; font-size: 1.3vw; color: var(--dim); }
+  .lockinfo .blau.locked { color: var(--blue); }
+  .lockinfo .rot.locked { color: var(--red); }
+
+  /* Scoreboard: Blau/Rot Split als Arcade-VS-Screen */
+  #s-score { flex-direction: row; align-items: stretch; }
+  .half { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh; }
+  .half.blau { background: #081c38; border-right: .5vw solid var(--bg); }
+  .half.rot  { background: #2c0800; border-left: .5vw solid var(--bg); }
+  .half .pname { font-size: 2.2vw; }
+  .half.blau .pname { color: var(--blue); } .half.rot .pname { color: var(--red); }
+  .half .pscore { font-size: 8vw; text-shadow: .6vw .6vw 0 #000; }
+  .vs {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    background: var(--bg); border: .5vw solid var(--gold);
+    width: 9vw; height: 9vw; display: flex; align-items: center; justify-content: center;
+    font-size: 2.4vw; color: var(--gold); z-index: 3;
+  }
+
+  /* Finale */
+  #winnerTitle { font-size: 4.5vw; line-height: 1.8; text-align: center; text-shadow: .5vw .5vw 0 #000; }
+  #winnerTitle.blau { color: var(--blue); } #winnerTitle.rot { color: var(--red); } #winnerTitle.tie { color: var(--gold); }
+  #finalScores { font-size: 1.8vw; color: var(--dim); margin-top: 4vh; }
+  .msg { font-size: 1.8vw; color: var(--dim); text-align: center; line-height: 2; }
+  /* Highscore-Liste */
+  #highscoreList { margin-top: 5vh; font-size: 1.2vw; color: var(--dim); text-align: center; max-width: 50vw; }
+  #highscoreList h3 { color: var(--gold); font-size: 1.4vw; margin-bottom: 2vh; }
+  #highscoreList table { border-collapse: collapse; width: 100%; }
+  #highscoreList td { padding: .6vh 1.5vw; }
+  #highscoreList .hs-rank { color: var(--gold); }
+  #highscoreList .hs-crown { color: var(--gold); }
+  /* QR-Code Lobby */
+  #lobbyQr { width: 14vw; height: 14vw; margin-top: 4vh; border: .4vw solid var(--line); background: var(--panel); }
+  #lobbyQr img { width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+  <div class="brand">Quiz<b>C</b><i>a</i>st</div>
+
+  <div class="screen active" id="s-idle"><div class="msg">Warte auf Verbindung vom Host<span class="blink">▮</span></div></div>
+
+  <div class="screen" id="s-lobby">
+    <div id="lobbyCode">······</div>
+    <div class="lobbyHint">Handy → <span id="joinUrl"></span> → Code eingeben <span class="blink">▮</span></div>
+    <div class="lobbySlots">
+      <div class="lslot" id="tslot0">P1 wartet…</div>
+      <div class="lslot" id="tslot1">P2 wartet…</div>
+    </div>
+    <div id="lobbyQr"><img id="lobbyQrImg" alt="QR-Code"></div>
+  </div>
+
+  <div class="screen" id="s-catwait"><div class="msg" id="catMsg"></div></div>
+
+  <div class="screen" id="s-question">
+    <div class="spine">
+      <div class="bar b" id="barBlau"></div>
+      <div id="tvTimer">–</div>
+      <div class="bar r" id="barRot"></div>
+    </div>
+    <div id="tvQmeta"></div>
+    <div id="tvQuestion"></div>
+    <div class="tvAnswers" id="tvAnswers"></div>
+    <div class="lockinfo">
+      <span class="blau" id="lockBlau">□ Blau überlegt…</span>
+      <span class="rot" id="lockRot">□ Rot überlegt…</span>
+    </div>
+  </div>
+
+  <div class="screen" id="s-score">
+    <div class="half blau"><div class="pname" id="nameBlau"></div><div class="pscore" id="scoreBlau">0</div></div>
+    <div class="vs">VS</div>
+    <div class="half rot"><div class="pname" id="nameRot"></div><div class="pscore" id="scoreRot">0</div></div>
+  </div>
+
+  <div class="screen" id="s-final">
+    <div id="winnerTitle"></div>
+    <div id="finalScores"></div>
+    <div id="highscoreList"></div>
+  </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const socket = io();
+let joined = false;
+
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(id).classList.add("active");
+}
+
+$("joinUrl").textContent = location.origin + "/player/";
+
+// Reiner Zuschauer: joint per join_as_spectator, sendet danach NIE Daten zurueck.
+function joinRoom(code) {
+  if (joined || !code) return;
+  socket.emit("join_as_spectator", { code: code.toUpperCase() }, res => {
+    if (!res.ok) { $("s-idle").querySelector(".msg").textContent = "Raum nicht gefunden: " + code; return; }
+    joined = true;
+    $('lobbyCode').textContent = code.toUpperCase();
+    // v2: QR-Code fuer die Lobby laden
+    const playerUrl = location.origin + '/player/?code=' + code.toUpperCase();
+    $('lobbyQrImg').src = '/api/qr?url=' + encodeURIComponent(playerUrl);
+    show('s-lobby');
+  });
+}
+
+// ── Weg 1: Cast Receiver (laeuft auf dem Chromecast) ───
+// Host schickt den Code per Custom-Namespace, danach normales Socket.io.
+try {
+  if (window.cast && cast.framework) {
+    const ctx = cast.framework.CastReceiverContext.getInstance();
+    ctx.addCustomMessageListener("urn:x-cast:quizcast", ev => {
+      if (ev.data && ev.data.code) joinRoom(ev.data.code);
+    });
+    ctx.start({ disableIdleTimeout: true });
+  }
+} catch (e) { /* kein Cast-Kontext -> Browser-Fallback */ }
+
+// ── Weg 2: Browser-Fallback: /receiver/?code=XXXXXX ────
+const urlCode = new URLSearchParams(location.search).get("code");
+if (urlCode) socket.on("connect", () => joinRoom(urlCode));
+
+// ── Spielanzeige ───────────────────────────────────────
+socket.on("player_joined", ({ players }) => {
+  ["tslot0", "tslot1"].forEach((id, i) => {
+    const p = players[i];
+    if (p) { $(id).textContent = p.name; $(id).className = "lslot filled " + p.color; }
+  });
+});
+
+socket.on("category_select", ({ chooserName, chooserColor }) => {
+  $("catMsg").innerHTML = `<span style="color:var(--${chooserColor === "blau" ? "blue" : "red"})">${chooserName}</span><br>wählt die Kategorie<span class="blink">▮</span>`;
+  show("s-catwait");
+});
+
+let currentAnswerEls = [];
+socket.on("next_question", d => {
+  $("tvQmeta").textContent = `Frage ${d.index} / ${d.total} · ${d.category}`;
+  $("tvQuestion").textContent = d.question;
+  const box = $("tvAnswers");
+  box.innerHTML = "";
+  currentAnswerEls = d.answers.map((a, i) => {
+    const el = document.createElement("div");
+    el.className = "a";
+    el.innerHTML = `<span class="idx">${"ABCD"[i]}</span><span></span>`;
+    el.lastElementChild.textContent = a;
+    box.appendChild(el);
+    return el;
+  });
+  $("barBlau").classList.remove("locked");
+  $("barRot").classList.remove("locked");
+  $("lockBlau").textContent = "□ Blau überlegt…"; $("lockBlau").classList.remove("locked");
+  $("lockRot").textContent = "□ Rot überlegt…"; $("lockRot").classList.remove("locked");
+  $("tvTimer").classList.remove("hot");
+  show("s-question");
+});
+
+socket.on("timer_tick", ({ remaining }) => {
+  $("tvTimer").textContent = remaining;
+  if (remaining <= 5) $("tvTimer").classList.add("hot");
+});
+
+// TV zeigt nur DASS jemand geantwortet hat, nie WAS.
+socket.on("lock_answer", ({ color }) => {
+  if (color === "blau") { $("barBlau").classList.add("locked"); $("lockBlau").textContent = "■ Blau hat geantwortet"; $("lockBlau").classList.add("locked"); }
+  if (color === "rot")  { $("barRot").classList.add("locked");  $("lockRot").textContent = "■ Rot hat geantwortet";  $("lockRot").classList.add("locked"); }
+});
+
+socket.on("reveal_answer", ({ correctIndex }) => {
+  currentAnswerEls.forEach((el, i) => el.classList.add(i === correctIndex ? "correct" : "faded"));
+});
+
+socket.on("update_score", ({ players }) => {
+  const blau = players.find(p => p.color === "blau"), rot = players.find(p => p.color === "rot");
+  if (blau) { $("nameBlau").textContent = blau.name; $("scoreBlau").textContent = blau.score; }
+  if (rot)  { $("nameRot").textContent = rot.name;  $("scoreRot").textContent = rot.score; }
+  show("s-score");
+});
+
+socket.on("game_finished", ({ players, winner }) => {
+  const t = $("winnerTitle");
+  if (winner === null) { t.textContent = "Unentschieden!"; t.className = "tie"; }
+  else {
+    const w = players.find(p => p.color === winner);
+    t.textContent = `★ ${w.name} gewinnt! ★`;
+    t.className = winner;
+  }
+  $("finalScores").textContent = players.map(p => `${p.name}: ${p.score}`).join("   ·   ");
+  // v2: Highscore-Liste laden und anzeigen.
+  fetch("/api/highscores")
+    .then(r => r.json())
+    .then(rows => {
+      if (!rows.length) return;
+      const list = $("highscoreList");
+      const rows10 = rows.slice(0, 10);
+      list.innerHTML = "<h3>★ HIGHSCORES ★</h3><table>" +
+        rows10.map((r, i) =>
+          `<tr><td class="hs-rank">${i + 1}.</td>` +
+          `<td>${r.name}</td>` +
+          `<td>${r.score} Pkt</td>` +
+          `<td class="hs-crown">${r.is_winner ? "★" : ""}</td></tr>`
+        ).join("") + "</table>";
+    })
+    .catch(() => {});
+  show("s-final");
+});
+
+socket.on("game_aborted", ({ reason }) => {
+  $("s-idle").querySelector(".msg").textContent = "Spiel abgebrochen: " + reason;
+  show("s-idle");
+});
+</script>
+<!-- CAF Receiver SDK: laedt nur auf dem Chromecast wirklich, im Browser harmlos -->
+<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+</body>
+</html>

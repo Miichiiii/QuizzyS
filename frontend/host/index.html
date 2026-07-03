@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuizCast · Host</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f23; --panel: #1a1a35; --line: #3a3a6a;
+    --white: #fcfcfc; --dim: #7c7ca8;
+    --blue: #3cbcfc; --red: #f83800; --gold: #f8b800; --good: #00a800;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--white);
+    font-family: "Press Start 2P", monospace;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 32px 20px; line-height: 1.7;
+    image-rendering: pixelated;
+  }
+  /* CRT-Scanlines */
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 99;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 2px, transparent 2px 4px);
+  }
+  .brand { font-size: 12px; color: var(--dim); }
+  .brand b { color: var(--blue); } .brand i { color: var(--red); font-style: normal; }
+  h1 { font-size: 9px; color: var(--dim); margin-top: 40px; text-transform: uppercase; }
+  .code {
+    font-size: clamp(28px, 10vw, 56px); letter-spacing: .1em;
+    margin: 14px 0 10px; padding-left: .1em; color: var(--gold);
+    text-shadow: 4px 4px 0 #5a3a00;
+  }
+  .hint { color: var(--dim); font-size: 8px; text-align: center; }
+  .hint code { color: var(--white); font-family: inherit; }
+  .players { display: flex; gap: 16px; margin: 36px 0; width: 100%; max-width: 480px; }
+  .slot {
+    flex: 1; border: 4px dashed var(--line);
+    padding: 18px 10px; text-align: center; color: var(--dim);
+    font-size: 9px; transition: none;
+  }
+  .slot.filled.blau { border: 4px solid var(--blue); color: var(--blue); background: #0a2038; box-shadow: 4px 4px 0 #0a2038; }
+  .slot.filled.rot  { border: 4px solid var(--red);  color: var(--red);  background: #300800; box-shadow: 4px 4px 0 #300800; }
+  .slot .tag { display: block; font-size: 7px; margin-bottom: 8px; opacity: .8; }
+  .kick-btn {
+    font: inherit; font-size: 8px; border: 2px solid currentColor;
+    padding: 4px 8px; cursor: pointer; background: transparent;
+    color: inherit; box-shadow: none; width: auto; max-width: none;
+    margin-top: 10px; display: none;
+  }
+  .slot.filled .kick-btn { display: inline-block; }
+  .kick-btn:active { transform: translate(1px,1px); }
+  button {
+    font: inherit; font-size: 11px; border: 4px solid var(--white);
+    padding: 16px 20px; cursor: pointer; width: 100%; max-width: 480px;
+    background: var(--panel); color: var(--white);
+    box-shadow: 5px 5px 0 #000; text-transform: uppercase;
+  }
+  button:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 #000; }
+  #startBtn { background: var(--good); border-color: var(--white); }
+  #startBtn:disabled {
+    background: var(--panel); color: var(--dim); border-color: var(--line);
+    cursor: not-allowed; box-shadow: 5px 5px 0 #000; transform: none;
+  }
+  #castBtn { margin-bottom: 16px; }
+  #castBtn.connected { border-color: var(--gold); color: var(--gold); }
+  #status { margin-top: 22px; color: var(--dim); font-size: 8px; min-height: 16px; text-align: center; word-break: break-all; }
+  .live { margin-top: 32px; font-size: 8px; color: var(--dim); text-align: center; line-height: 2.2; max-width: 480px; }
+  #qrWrap { margin: 14px auto 0; width: 140px; height: 140px; border: 4px solid var(--line); background: var(--panel); display: none; }
+  #qrWrap img { width: 100%; height: 100%; display: block; }
+  .blink { animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .blink { animation: none; } }
+</style>
+</head>
+<body>
+  <div class="brand">Quiz<b>C</b><i>a</i>st</div>
+
+  <h1>Spiel-Code</h1>
+  <div class="code" id="code">······</div>
+  <div class="hint">Spieler: <code id="playerUrl">/player</code><br>Code eingeben <span class="blink">▮</span></div>
+  <div id="qrWrap"><img id="qrImg" alt="QR-Code zum Beitreten"></div>
+
+  <div class="players">
+    <div class="slot" id="slot0"><span class="tag">P1 · BLAU</span><span class="name">wartet…</span><button class="kick-btn" data-color="blau">[X] Kick</button></div>
+    <div class="slot" id="slot1"><span class="tag">P2 · ROT</span><span class="name">wartet…</span><button class="kick-btn" data-color="rot">[X] Kick</button></div>
+  </div>
+
+  <button id="castBtn">▶ Auf TV casten</button>
+  <button id="startBtn" disabled>Spiel starten</button>
+  <div id="status"></div>
+  <div class="live" id="live"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ── Konfiguration ──────────────────────────────────────
+// App ID aus der Google Cast Developer Console (nach Registrierung der /receiver-URL).
+// Solange leer/Platzhalter: Cast-Button erklaert den Fallback statt zu crashen.
+const CAST_APP_ID = "REPLACE_WITH_CAST_APP_ID";
+const CAST_NAMESPACE = "urn:x-cast:quizcast";
+
+const socket = io();
+let gameCode = null;
+let castSession = null;
+
+const $ = id => document.getElementById(id);
+$("playerUrl").textContent = location.origin + "/player/";
+
+// Spiel erstellen sobald verbunden
+socket.on("connect", () => {
+  if (gameCode) return; // kein Doppel-Create bei Socket-Reconnect
+  socket.emit("create_game", {}, res => {
+    if (!res.ok) { $("status").textContent = "Fehler beim Erstellen."; return; }
+    gameCode = res.code;
+    $("code").textContent = gameCode;
+    // v2: QR-Code laden
+    const playerUrl = location.origin + "/player/?code=" + gameCode;
+    $("qrImg").src = "/api/qr?url=" + encodeURIComponent(playerUrl);
+    $("qrWrap").style.display = "block";
+  });
+});
+
+socket.on("player_joined", ({ players }) => {
+  ["slot0", "slot1"].forEach((id, i) => {
+    const slot = $(id), p = players[i];
+    if (p) {
+      slot.className = "slot filled " + p.color;
+      slot.querySelector(".name").textContent = p.name;
+    } else {
+      slot.className = "slot";
+      slot.querySelector(".name").textContent = "wartet…";
+    }
+  });
+  $('startBtn').disabled = players.length !== 2;
+});
+
+// v2: Kick-Buttons
+document.querySelectorAll('.kick-btn').forEach(btn => {
+  btn.onclick = () => {
+    socket.emit('kick_player', { code: gameCode, color: btn.dataset.color }, res => {
+      if (!res.ok) $('status').textContent = res.error;
+    });
+  };
+});
+
+$('startBtn').onclick = () => {
+  socket.emit('start_game', { code: gameCode }, res => {
+    if (!res.ok) $('status').textContent = res.error;
+  });
+  // Kick-Buttons nach Start verstecken
+  document.querySelectorAll('.kick-btn').forEach(b => b.style.display = 'none');
+};
+
+socket.on("game_starting", () => {
+  $("startBtn").disabled = true;
+  $("startBtn").textContent = "Spiel läuft…";
+});
+
+// Host bekommt einen schlanken Live-Ticker, keine Spiel-UI (TV zeigt alles).
+socket.on("next_question", d => $("live").textContent = `Frage ${d.index}/${d.total}: ${d.question}`);
+socket.on("update_score", d => $("live").textContent = d.players.map(p => `${p.name}: ${p.score}`).join("  ·  "));
+socket.on("game_finished", d => {
+  $("live").textContent = "★ " + (d.winner ? `Team ${d.winner.toUpperCase()} gewinnt!` : "Unentschieden!") +
+    "  " + d.players.map(p => `${p.name}: ${p.score}`).join("  ·  ");
+});
+socket.on("game_aborted", d => $("status").textContent = "Spiel abgebrochen: " + d.reason);
+
+// ── Chromecast Sender ──────────────────────────────────
+// Cast SDK startet NUR die Receiver-App und uebergibt den Code.
+// Spiellogik laeuft danach komplett ueber Socket.io (Receiver joint selbst als Spectator).
+$("castBtn").onclick = () => {
+  if (!window.chrome || !chrome.cast || !castReady) {
+    $("status").innerHTML = "Cast nur in Chrome (Desktop/Android). Fallback: TV-Browser auf <b>" +
+      location.origin + "/receiver/?code=" + (gameCode || "") + "</b>";
+    return;
+  }
+  chrome.cast.requestSession(session => {
+    castSession = session;
+    $("castBtn").classList.add("connected");
+    $("castBtn").textContent = "▶ Verbunden mit TV";
+    sendCodeToTv();
+  }, err => { $("status").textContent = "Cast fehlgeschlagen: " + (err.description || err.code); });
+};
+
+function sendCodeToTv() {
+  if (castSession && gameCode) {
+    castSession.sendMessage(CAST_NAMESPACE, { code: gameCode }, () => {}, () => {});
+  }
+}
+
+let castReady = false;
+window.__onGCastApiAvailable = (available) => {
+  if (!available || CAST_APP_ID.startsWith("REPLACE")) return;
+  const config = new chrome.cast.ApiConfig(
+    new chrome.cast.SessionRequest(CAST_APP_ID),
+    session => { castSession = session; sendCodeToTv(); },
+    () => {}
+  );
+  chrome.cast.initialize(config, () => { castReady = true; }, () => {});
+};
+</script>
+<script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+</body>
+</html>

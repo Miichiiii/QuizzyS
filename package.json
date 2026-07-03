@@ -1,0 +1,19 @@
+{
+  "name": "quizcast",
+  "version": "1.0.0",
+  "description": "2-Spieler Chromecast Quiz - Server ist Single Source of Truth",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "test": "node test/smoke.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "express": "^4.19.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.7.5"
+  }
+}

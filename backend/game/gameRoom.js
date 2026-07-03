@@ -1,0 +1,295 @@
+// GameRoom: State Machine pro Spiel-Raum. In-Memory, kein DB-Zwang (Spec).
+// Server ist Single Source of Truth. Alle Timer laufen HIER, nie im Client.
+//
+// States: LOBBY -> WAITING_FOR_PLAYERS -> CATEGORY_SELECT -> QUESTION_ACTIVE
+//         -> ANSWER_LOCKED -> SHOW_RESULT -> SCOREBOARD -> (naechste Frage | GAME_FINISHED)
+//
+// v2: Reconnect – Spieler-Disconnect pausiert Raum 60s, kein sofortiger Kill.
+
+const { getCategories, getQuestionsForCategory } = require("./questions");
+
+// Delays konfigurierbar, damit der Smoke-Test nicht 30s wartet. Kostet nichts, hilft viel.
+const SHOW_RESULT_MS = parseInt(process.env.SHOW_RESULT_MS || "3000", 10);
+const SCOREBOARD_MS = parseInt(process.env.SCOREBOARD_MS || "3000", 10);
+const RECONNECT_TIMEOUT_MS = parseInt(process.env.RECONNECT_TIMEOUT_MS || "60000", 10);
+const QUESTIONS_PER_GAME = 5;
+
+const COLORS = ["blau", "rot"];
+
+class GameRoom {
+  constructor(code, io) {
+    this.code = code;
+    this.io = io; // socket.io Server-Instanz
+    this.state = "LOBBY";
+    this.hostSocketId = null;
+    this.players = []; // { socketId, name, color, score }
+    this.spectators = new Set(); // Socket-IDs (TV/Receiver). Senden NIE Daten zurueck.
+    this.questions = [];
+    this.currentIndex = -1;
+    this.answers = {}; // socketId -> { index, ms } pro Frage
+    this.questionStartedAt = 0;
+    this.tickInterval = null;
+    this.pendingTimeout = null;
+    this.finished = false;
+    // v2 Reconnect: color -> { name, score, answerThisRound, reconnectTimer }
+    this.disconnectedPlayers = new Map();
+  }
+
+  // Alle im Raum (Host + Player + Spectators) benachrichtigen
+  broadcast(event, data) {
+    this.io.to(this.code).emit(event, data);
+  }
+
+  setHost(socketId) {
+    this.hostSocketId = socketId;
+    this.state = "WAITING_FOR_PLAYERS";
+  }
+
+  addPlayer(socketId, name) {
+    if (this.state !== "WAITING_FOR_PLAYERS") return { ok: false, error: "Spiel läuft bereits oder existiert nicht." };
+    if (this.players.length >= 2) return { ok: false, error: "Raum ist voll (max. 2 Spieler)." };
+    const color = COLORS[this.players.length]; // fix: erster blau, zweiter rot
+    const player = { socketId, name: String(name || "Spieler").slice(0, 20), color, score: 0 };
+    this.players.push(player);
+    // Getrennte Events (Spec-Warnung): player_joined NUR fuer Lobby-Update.
+    this.broadcast("player_joined", { players: this.publicPlayers() });
+    return { ok: true, color, code: this.code };
+  }
+
+  addSpectator(socketId) {
+    this.spectators.add(socketId);
+    // Spectator bekommt den aktuellen Lobby-Stand sofort, egal wann er joint.
+    this.io.to(socketId).emit("player_joined", { players: this.publicPlayers() });
+  }
+
+  // v2: Host kickt Spieler aus der Lobby.
+  kickPlayer(hostSocketId, color) {
+    if (hostSocketId !== this.hostSocketId) return { ok: false, error: "Nur der Host darf kicken." };
+    if (this.state !== "WAITING_FOR_PLAYERS") return { ok: false, error: "Kick nur in der Lobby moeglich." };
+    const idx = this.players.findIndex(p => p.color === color);
+    if (idx === -1) return { ok: false, error: "Spieler nicht gefunden." };
+    const kicked = this.players[idx];
+    this.players.splice(idx, 1);
+    // Farben neu vergeben, damit der naechste Spieler den freien Slot bekommt.
+    this.players.forEach((p, i) => { p.color = COLORS[i]; });
+    // Dem gekickten Spieler direkt Bescheid geben.
+    this.io.to(kicked.socketId).emit("kicked", { reason: "Du wurdest vom Host aus dem Spiel entfernt." });
+    this.broadcast("player_joined", { players: this.publicPlayers() });
+    return { ok: true, kickedSocketId: kicked.socketId };
+  }
+
+  // v2: Spieler hat Verbindung verloren – Slot 60s offen halten.
+  playerDisconnected(socketId) {
+    const player = this.players.find(p => p.socketId === socketId);
+    if (!player) return;
+    // Slot haengen lassen (socketId bleibt), aber als offline markieren.
+    const answer = this.answers[socketId] || null;
+    const timer = setTimeout(() => {
+      // Zeit abgelaufen, kein Reconnect – Raum zerstoeren.
+      this.disconnectedPlayers.delete(player.color);
+      this.destroy("Spieler hat sich nicht rechtzeitig wieder verbunden.");
+    }, RECONNECT_TIMEOUT_MS);
+    this.disconnectedPlayers.set(player.color, {
+      name: player.name,
+      score: player.score,
+      answerThisRound: answer,
+      reconnectTimer: timer
+    });
+    this.broadcast("player_disconnected", { color: player.color });
+  }
+
+  // v2: Spieler kehrt zurueck. Gibt { ok, color } oder { ok: false, error } zurueck.
+  reconnectPlayer(newSocketId, color, name) {
+    if (this.finished) return { ok: false, error: "Spiel bereits beendet." };
+    const entry = this.disconnectedPlayers.get(color);
+    if (!entry) return { ok: false, error: "Kein offener Reconnect-Slot fuer diese Farbe." };
+    // Timer stoppen, Slot wieder aktivieren.
+    clearTimeout(entry.reconnectTimer);
+    this.disconnectedPlayers.delete(color);
+    const player = this.players.find(p => p.color === color);
+    if (!player) return { ok: false, error: "Interner Fehler: Spieler-Slot fehlt." };
+    player.socketId = newSocketId;
+    // Falls Antwort fuer diese Runde schon da war, wiederherstellen.
+    if (entry.answerThisRound) {
+      this.answers[newSocketId] = entry.answerThisRound;
+      // Alte socketId-Schluesselbindung entfernen (war aber schon verloren).
+    }
+    this.broadcast("player_joined", { players: this.publicPlayers() });
+    // Reconnected Spieler bekommt aktuellen State-Snapshot.
+    const snap = this._stateSnapshot();
+    this.io.to(newSocketId).emit("reconnect_ok", snap);
+    return { ok: true, color };
+  }
+
+  // Liefert einen Snapshot des aktuellen Spielstands fuer den reconnecteten Spieler.
+  _stateSnapshot() {
+    const base = { state: this.state, players: this.publicPlayers() };
+    if (this.state === "QUESTION_ACTIVE" || this.state === "ANSWER_LOCKED") {
+      const q = this.questions[this.currentIndex];
+      const elapsed = Math.floor((Date.now() - this.questionStartedAt) / 1000);
+      const remaining = Math.max(0, q.timeLimit - elapsed);
+      return {
+        ...base,
+        question: {
+          index: this.currentIndex + 1,
+          total: this.questions.length,
+          category: q.category,
+          question: q.question,
+          answers: q.answers,
+          timeLimit: q.timeLimit,
+          remaining
+        }
+      };
+    }
+    return base;
+  }
+
+  publicPlayers() {
+    return this.players.map(p => ({ name: p.name, color: p.color, score: p.score }));
+  }
+
+  // Host drueckt Start. Getrenntes Event game_starting (Spec-Warnung: NICHT game_ready doppelt nutzen).
+  start(socketId) {
+    if (socketId !== this.hostSocketId) return { ok: false, error: "Nur der Host darf starten." };
+    if (this.players.length !== 2) return { ok: false, error: "Es müssen genau 2 Spieler im Raum sein." };
+    if (this.state !== "WAITING_FOR_PLAYERS") return { ok: false, error: "Spiel wurde bereits gestartet." };
+    this.state = "CATEGORY_SELECT";
+    this.broadcast("game_starting", { players: this.publicPlayers() });
+    // Blauer Spieler (Spieler 1) waehlt die Kategorie.
+    this.broadcast("category_select", {
+      chooserColor: "blau",
+      chooserName: this.players[0].name,
+      categories: getCategories()
+    });
+    return { ok: true };
+  }
+
+  selectCategory(socketId, category) {
+    if (this.state !== "CATEGORY_SELECT") return { ok: false, error: "Keine Kategoriewahl aktiv." };
+    if (socketId !== this.players[0].socketId) return { ok: false, error: "Nur der blaue Spieler wählt die Kategorie." };
+    const pool = getQuestionsForCategory(category);
+    if (pool.length === 0) return { ok: false, error: "Unbekannte Kategorie." };
+    // Einfaches Mischen reicht (caveman shuffle)
+    this.questions = pool.slice().sort(() => Math.random() - 0.5).slice(0, QUESTIONS_PER_GAME);
+    this.nextQuestion();
+    return { ok: true };
+  }
+
+  nextQuestion() {
+    this.currentIndex++;
+    if (this.currentIndex >= this.questions.length) {
+      this.finish();
+      return;
+    }
+    const q = this.questions[this.currentIndex];
+    this.answers = {};
+    this.state = "QUESTION_ACTIVE";
+    this.questionStartedAt = Date.now();
+
+    // correctIndex wird hier BEWUSST NICHT mitgesendet.
+    this.broadcast("next_question", {
+      index: this.currentIndex + 1,
+      total: this.questions.length,
+      category: q.category,
+      question: q.question,
+      answers: q.answers,
+      timeLimit: q.timeLimit
+    });
+
+    // Serverseitiger Timer, broadcast timer_tick jede Sekunde.
+    let remaining = q.timeLimit;
+    this.broadcast("timer_tick", { remaining });
+    this.clearTimers();
+    this.tickInterval = setInterval(() => {
+      remaining--;
+      this.broadcast("timer_tick", { remaining });
+      if (remaining <= 0) this.lockAndReveal();
+    }, 1000);
+  }
+
+  submitAnswer(socketId, answerIndex) {
+    if (this.state !== "QUESTION_ACTIVE") return { ok: false, error: "Gerade keine aktive Frage." };
+    const player = this.players.find(p => p.socketId === socketId);
+    if (!player) return { ok: false, error: "Du bist kein Spieler in diesem Raum." };
+    if (this.answers[socketId]) return { ok: false, error: "Antwort bereits abgegeben." };
+
+    const idx = parseInt(answerIndex, 10);
+    if (isNaN(idx) || idx < 0 || idx > 3) return { ok: false, error: "Ungültige Antwort." };
+
+    this.answers[socketId] = { index: idx, ms: Date.now() - this.questionStartedAt };
+    // lock_answer: TV zeigt "Blau hat geantwortet", Gegner sieht "Warte auf Gegner".
+    // KEINE Info, WAS geantwortet wurde, und keine Scores waehrend aktiver Frage.
+    this.broadcast("lock_answer", { color: player.color });
+
+    // Beide fertig? Sofortiger Reveal statt auf Timer warten (Spec).
+    if (Object.keys(this.answers).length === this.players.length) this.lockAndReveal();
+    return { ok: true };
+  }
+
+  lockAndReveal() {
+    if (this.state !== "QUESTION_ACTIVE") return;
+    this.state = "ANSWER_LOCKED";
+    this.clearTimers();
+
+    const q = this.questions[this.currentIndex];
+
+    // Serverseitige Validierung + Scoring: +100 richtig, +50 schnellster Richtiger.
+    const correctOnes = [];
+    const results = {};
+    for (const p of this.players) {
+      const a = this.answers[p.socketId];
+      const answered = !!a;
+      const correct = answered && a.index === q.correctIndex;
+      if (correct) {
+        p.score += 100;
+        correctOnes.push({ p, ms: a.ms });
+      }
+      results[p.color] = { name: p.name, answered, answerIndex: answered ? a.index : null, correct, gained: correct ? 100 : 0 };
+    }
+    if (correctOnes.length > 0) {
+      correctOnes.sort((x, y) => x.ms - y.ms);
+      correctOnes[0].p.score += 50;
+      results[correctOnes[0].p.color].gained += 50;
+      results[correctOnes[0].p.color].fastest = true;
+    }
+
+    // JETZT (und erst jetzt) verlaesst correctIndex den Server.
+    this.state = "SHOW_RESULT";
+    this.broadcast("reveal_answer", { correctIndex: q.correctIndex, results });
+
+    this.pendingTimeout = setTimeout(() => {
+      this.state = "SCOREBOARD";
+      this.broadcast("update_score", { players: this.publicPlayers() });
+      this.pendingTimeout = setTimeout(() => this.nextQuestion(), SCOREBOARD_MS);
+    }, SHOW_RESULT_MS);
+  }
+
+  finish() {
+    this.state = "GAME_FINISHED";
+    this.finished = true;
+    this.clearTimers();
+    const [a, b] = this.players;
+    let winner = null; // null = Unentschieden
+    if (a && b) winner = a.score === b.score ? null : (a.score > b.score ? a.color : b.color);
+    this.broadcast("game_finished", { players: this.publicPlayers(), winner });
+    // v2: Optionaler Callback fuer Persistenz (DB-Schreiben in server.js, nicht hier).
+    if (typeof this.onFinish === "function") this.onFinish(this.publicPlayers(), winner);
+  }
+
+  clearTimers() {
+    if (this.tickInterval) { clearInterval(this.tickInterval); this.tickInterval = null; }
+    if (this.pendingTimeout) { clearTimeout(this.pendingTimeout); this.pendingTimeout = null; }
+  }
+
+  // Raum aufraeumen. Laedt alle laufenden Reconnect-Timer ab.
+  destroy(reason) {
+    this.clearTimers();
+    for (const entry of this.disconnectedPlayers.values()) {
+      clearTimeout(entry.reconnectTimer);
+    }
+    this.disconnectedPlayers.clear();
+    this.broadcast("game_aborted", { reason });
+  }
+}
+
+module.exports = { GameRoom };

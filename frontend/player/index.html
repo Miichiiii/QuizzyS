@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>QuizCast · Spieler</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f23; --panel: #1a1a35; --line: #3a3a6a;
+    --white: #fcfcfc; --dim: #7c7ca8;
+    --blue: #3cbcfc; --red: #f83800; --gold: #f8b800; --good: #00a800;
+    --my: var(--dim); --mybg: var(--bg);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg); color: var(--white);
+    font-family: "Press Start 2P", monospace; line-height: 1.7;
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column; padding: 22px 16px;
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 99;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 2px, transparent 2px 4px);
+  }
+  body.blau { background: #081428; --my: var(--blue); --mybg: #0a2038; }
+  body.rot  { background: #1c0500; --my: var(--red);  --mybg: #300800; }
+  .screen { display: none; flex: 1; flex-direction: column; }
+  .screen.active { display: flex; }
+  .top { font-size: 8px; color: var(--my); min-height: 14px; text-transform: uppercase; }
+  h2 { font-size: 14px; margin: 14px 0 24px; line-height: 1.6; }
+  input {
+    font: inherit; font-size: 11px; width: 100%; padding: 15px 12px;
+    border: 4px solid var(--line); background: var(--panel);
+    color: var(--white); margin-bottom: 14px; outline: none;
+  }
+  input:focus { border-color: var(--white); }
+  input#code { letter-spacing: .25em; text-transform: uppercase; }
+  button {
+    font: inherit; font-size: 11px; border: 4px solid var(--white);
+    padding: 16px; cursor: pointer; width: 100%;
+    background: var(--good); color: var(--white);
+    box-shadow: 5px 5px 0 #000; text-transform: uppercase;
+  }
+  button:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 #000; }
+  .err { color: var(--red); margin-top: 14px; min-height: 16px; font-size: 8px; }
+  .center { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 16px; }
+  .big { font-size: 15px; line-height: 1.8; }
+  .dim { color: var(--dim); font-size: 8px; }
+  .pulse { width: 14px; height: 14px; background: var(--my); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .pulse, .blink { animation: none; } }
+  .qmeta { display: flex; justify-content: space-between; font-size: 8px; color: var(--dim); }
+  #timer { color: var(--my); }
+  #qtext { font-size: 12px; margin: 18px 0 22px; line-height: 1.9; }
+  .answers, .cats { display: grid; gap: 12px; }
+  .answers button, .cats button {
+    background: var(--panel); color: var(--white);
+    border: 4px solid var(--line); text-align: left; font-size: 10px;
+    line-height: 1.6; box-shadow: 4px 4px 0 #000;
+  }
+  .answers button .k { color: var(--dim); margin-right: 8px; }
+  .answers button.picked { border-color: var(--my); background: var(--mybg); color: var(--my); }
+  .answers button.picked .k { color: var(--my); }
+  .answers button:disabled { opacity: .55; }
+  .result-good { color: var(--good); } .result-bad { color: var(--red); } .result-gold { color: var(--gold); }
+</style>
+</head>
+<body>
+
+  <!-- Join -->
+  <div class="screen active" id="s-join">
+    <div class="top">QuizCast</div>
+    <h2>Mitspielen <span class="blink" style="animation:blink 1s steps(1) infinite">▮</span></h2>
+    <input id="name" placeholder="DEIN NAME" maxlength="20" autocomplete="off">
+    <input id="code" placeholder="SPIEL-CODE" maxlength="6" autocomplete="off">
+    <button id="joinBtn">Beitreten</button>
+    <div class="err" id="joinErr"></div>
+  </div>
+
+  <!-- Warten -->
+  <div class="screen" id="s-wait">
+    <div class="top" id="waitTag"></div>
+    <div class="center">
+      <div class="pulse"></div>
+      <div class="big" id="waitMsg">Warte auf Spielstart…</div>
+      <div class="dim">Schau auf den Fernseher</div>
+    </div>
+  </div>
+
+  <!-- Kategoriewahl (nur blauer Spieler) -->
+  <div class="screen" id="s-cat">
+    <div class="top" id="catTag"></div>
+    <h2>Wähle die Kategorie</h2>
+    <div class="cats" id="cats"></div>
+  </div>
+
+  <!-- Frage -->
+  <div class="screen" id="s-question">
+    <div class="qmeta"><span id="qnum"></span><span id="timer"></span></div>
+    <div id="qtext"></div>
+    <div class="answers" id="answers"></div>
+  </div>
+
+  <!-- Antwort gesendet -->
+  <div class="screen" id="s-locked">
+    <div class="center">
+      <div class="big">Antwort gesendet ✓</div>
+      <div class="dim">Warte auf Gegner…</div>
+    </div>
+  </div>
+
+  <!-- Ergebnis der Frage -->
+  <div class="screen" id="s-result">
+    <div class="center">
+      <div class="big" id="resultMsg"></div>
+      <div class="dim" id="resultSub"></div>
+    </div>
+  </div>
+
+  <!-- Spielende -->
+  <div class="screen" id="s-final">
+    <div class="center">
+      <div class="big" id="finalMsg"></div>
+      <div class="dim" id="finalScore"></div>
+    </div>
+  </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const $ = id => document.getElementById(id);
+let myColor = null, gameCode = null, myName = null, answered = false;
+
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(id).classList.add("active");
+}
+
+function applyColor(color) {
+  myColor = color;
+  document.body.className = myColor;
+  $("waitTag").textContent = "Team " + myColor;
+  $("catTag").textContent = "Team " + myColor;
+}
+
+// v2: Reconnect – Code + Farbe im sessionStorage merken.
+function saveSession(code, color, name) {
+  sessionStorage.setItem("qc_code", code);
+  sessionStorage.setItem("qc_color", color);
+  sessionStorage.setItem("qc_name", name || "Spieler");
+}
+function clearSession() { sessionStorage.removeItem("qc_code"); sessionStorage.removeItem("qc_color"); sessionStorage.removeItem("qc_name"); }
+
+// Bei (Re-)Connect: gespeicherte Session automatisch nutzen.
+socket.on("connect", () => {
+  const savedCode = sessionStorage.getItem("qc_code");
+  const savedColor = sessionStorage.getItem("qc_color");
+  const savedName = sessionStorage.getItem("qc_name");
+  if (savedCode && savedColor && savedName && !myColor) {
+    socket.emit("reconnect_player", { code: savedCode, color: savedColor, name: savedName }, res => {
+      if (res.ok) {
+        gameCode = savedCode;
+        myName = savedName;
+        applyColor(res.color);
+        $("waitMsg").textContent = "Wieder verbunden…";
+        show("s-wait");
+      } else {
+        // Reconnect fehlgeschlagen (z.B. Spiel vorbei) – Session loeschen, Join-Screen zeigen.
+        clearSession();
+      }
+    });
+  }
+});
+
+// v2: Server bestaetigt Reconnect mit State-Snapshot.
+socket.on("reconnect_ok", snap => {
+  if (snap.state === "QUESTION_ACTIVE" && snap.question) {
+    // Frage erneut anzeigen (Timer-Restzeit wird per timer_tick weitergesendet).
+    const d = snap.question;
+    answered = false;
+    $("qnum").textContent = `Frage ${d.index}/${d.total} · ${d.category}`;
+    $("qtext").textContent = d.question;
+    const box = $("answers");
+    box.innerHTML = "";
+    d.answers.forEach((a, i) => {
+      const b = document.createElement("button");
+      b.innerHTML = `<span class="k">${"ABCD"[i]}</span>`;
+      b.appendChild(document.createTextNode(a));
+      b.onclick = () => {
+        if (answered) return;
+        answered = true;
+        b.classList.add("picked");
+        box.querySelectorAll("button").forEach(x => x.disabled = true);
+        socket.emit("submit_answer", { code: gameCode, answerIndex: i }, res => {
+          if (res.ok) show("s-locked");
+        });
+      };
+      box.appendChild(b);
+    });
+    show("s-question");
+  }
+});
+
+$("joinBtn").onclick = () => {
+  const name = $("name").value.trim();
+  gameCode = $("code").value.trim().toUpperCase();
+  if (!name || gameCode.length !== 6) { $("joinErr").textContent = "Name und 6-stelliger Code nötig."; return; }
+  socket.emit("join_game", { code: gameCode, name }, res => {
+    if (!res.ok) { $("joinErr").textContent = res.error; return; }
+    myName = name;
+    applyColor(res.color);
+    saveSession(gameCode, res.color, name);
+    show("s-wait");
+  });
+};
+
+socket.on("game_starting", () => { $("waitMsg").textContent = "Los geht's!"; });
+
+socket.on("category_select", ({ chooserColor, categories }) => {
+  if (chooserColor !== myColor) {
+    $("waitMsg").textContent = "Gegner wählt die Kategorie…";
+    show("s-wait");
+    return;
+  }
+  const box = $("cats");
+  box.innerHTML = "";
+  categories.forEach(c => {
+    const b = document.createElement("button");
+    b.textContent = c;
+    b.onclick = () => socket.emit("select_category", { code: gameCode, category: c });
+    box.appendChild(b);
+  });
+  show("s-cat");
+});
+
+socket.on("next_question", d => {
+  answered = false;
+  $("qnum").textContent = `Frage ${d.index}/${d.total} · ${d.category}`;
+  $("qtext").textContent = d.question;
+  const box = $("answers");
+  box.innerHTML = "";
+  d.answers.forEach((a, i) => {
+    const b = document.createElement("button");
+    b.innerHTML = `<span class="k">${"ABCD"[i]}</span>`;
+    b.appendChild(document.createTextNode(a));
+    b.onclick = () => {
+      if (answered) return;
+      answered = true;
+      b.classList.add("picked");
+      box.querySelectorAll("button").forEach(x => x.disabled = true);
+      socket.emit("submit_answer", { code: gameCode, answerIndex: i }, res => {
+        if (res.ok) show("s-locked"); // "Antwort gesendet / Warte auf Gegner" - keine Scores (Spec)
+      });
+    };
+    box.appendChild(b);
+  });
+  show("s-question");
+});
+
+socket.on("timer_tick", ({ remaining }) => {
+  $("timer").textContent = remaining + "s";
+});
+
+socket.on("reveal_answer", ({ results }) => {
+  const me = results[myColor];
+  if (!me) return;
+  if (!me.answered) {
+    $("resultMsg").textContent = "Zeit abgelaufen";
+    $("resultMsg").className = "big result-bad";
+    $("resultSub").textContent = "+0 Punkte";
+  } else if (me.correct) {
+    $("resultMsg").textContent = me.fastest ? "Richtig + Speed-Bonus ★" : "Richtig!";
+    $("resultMsg").className = "big " + (me.fastest ? "result-gold" : "result-good");
+    $("resultSub").textContent = "+" + me.gained + " Punkte";
+  } else {
+    $("resultMsg").textContent = "Leider falsch";
+    $("resultMsg").className = "big result-bad";
+    $("resultSub").textContent = "+0 Punkte";
+  }
+  show("s-result");
+});
+
+socket.on("game_finished", ({ players, winner }) => {
+  clearSession();
+  if (winner === null) $("finalMsg").textContent = "Unentschieden!";
+  else if (winner === myColor) $("finalMsg").textContent = "★ You Win! ★";
+  else $("finalMsg").textContent = "Game Over…";
+  $("finalScore").textContent = players.map(p => `${p.name}: ${p.score}`).join("  ·  ");
+  show("s-final");
+});
+
+socket.on("game_aborted", ({ reason }) => {
+  clearSession();
+  $("finalMsg").textContent = "Spiel abgebrochen";
+  $("finalScore").textContent = reason;
+  show("s-final");
+});
+
+socket.on("kicked", ({ reason }) => {
+  clearSession();
+  $("finalMsg").textContent = "Rausgeworfen";
+  $("finalScore").textContent = reason;
+  show("s-final");
+});
+</script>
+</body>
+</html>
