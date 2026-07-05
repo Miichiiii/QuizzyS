@@ -1,0 +1,5 @@
+node_modules/
+backend/quizcast.db
+*.db
+*.db-journal
+.env
