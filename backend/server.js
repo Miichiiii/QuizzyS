@@ -40,7 +40,7 @@ app.get("/api/qr", async (req, res) => {
   }
 });
 
-// v2: Highscore-Endpunkt – Top-10 aus SQLite.
+// v2: Highscore-Endpunkt – Top-10 aus JSON-Datei.
 app.get("/api/highscores", (req, res) => {
   try {
     const rows = getHighscores(10);
@@ -48,6 +48,12 @@ app.get("/api/highscores", (req, res) => {
   } catch (e) {
     res.status(500).json([]);
   }
+});
+
+// Chromecast App-ID aus Umgebungsvariable (wird in Render Settings gesetzt).
+// Solange leer: Cast-Button zeigt Fallback-URL, nichts crasht.
+app.get("/api/config", (req, res) => {
+  res.json({ castAppId: process.env.CAST_APP_ID || "" });
 });
 
 // ── Room-Management (in-memory) ─────────────────────────

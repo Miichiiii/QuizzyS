@@ -96,14 +96,19 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 // ── Konfiguration ──────────────────────────────────────
-// App ID aus der Google Cast Developer Console (nach Registrierung der /receiver-URL).
-// Solange leer/Platzhalter: Cast-Button erklaert den Fallback statt zu crashen.
-const CAST_APP_ID = "REPLACE_WITH_CAST_APP_ID";
+// CAST_APP_ID wird vom Server geladen (Render-Env: CAST_APP_ID).
+// Solange nicht gesetzt: Cast-Button zeigt Fallback-URL.
 const CAST_NAMESPACE = "urn:x-cast:quizcast";
 
 const socket = io();
 let gameCode = null;
 let castSession = null;
+let CAST_APP_ID = "";
+
+// Config vom Server laden (einmalig beim Start).
+fetch("/api/config").then(r => r.json()).then(cfg => {
+  CAST_APP_ID = cfg.castAppId || "";
+}).catch(() => {});
 
 const $ = id => document.getElementById(id);
 $("playerUrl").textContent = location.origin + "/player/";
@@ -171,17 +176,20 @@ socket.on("game_aborted", d => $("status").textContent = "Spiel abgebrochen: " +
 // Cast SDK startet NUR die Receiver-App und uebergibt den Code.
 // Spiellogik laeuft danach komplett ueber Socket.io (Receiver joint selbst als Spectator).
 $("castBtn").onclick = () => {
-  if (!window.chrome || !chrome.cast || !castReady) {
-    $("status").innerHTML = "Cast nur in Chrome (Desktop/Android). Fallback: TV-Browser auf <b>" +
-      location.origin + "/receiver/?code=" + (gameCode || "") + "</b>";
-    return;
-  }
+  const receiverUrl = location.origin + "/receiver/?code=" + (gameCode || "");
+  // Fallback immer anzeigen – auch wenn Cast vorhanden ist.
+  $("status").innerHTML =
+    "TV-Browser: <b><a href=\"" + receiverUrl + "\" target=\"_blank\" style=\"color:var(--gold);font-family:inherit\">" +
+    receiverUrl + "</a></b>" +
+    "<br><span style='font-size:7px;color:var(--dim)'>oder QR-Code scannen ↑</span>";
+
+  if (!window.chrome || !chrome.cast || !castReady) return; // kein Cast SDK -> Fallback reicht
   chrome.cast.requestSession(session => {
     castSession = session;
     $("castBtn").classList.add("connected");
     $("castBtn").textContent = "▶ Verbunden mit TV";
     sendCodeToTv();
-  }, err => { $("status").textContent = "Cast fehlgeschlagen: " + (err.description || err.code); });
+  }, err => { /* Cast abgebrochen – Fallback-URL bleibt sichtbar */ });
 };
 
 function sendCodeToTv() {
