@@ -1,5 +1,6 @@
 node_modules/
 backend/quizcast.db
+backend/highscores.json
 *.db
 *.db-journal
 .env
