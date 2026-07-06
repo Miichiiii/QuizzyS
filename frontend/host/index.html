@@ -92,7 +92,14 @@
 </style>
 </head>
 <body>
-  <div class="brand">Quiz<b>C</b><i>a</i>st</div>
+  <div style="width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div class="brand" style="margin: 0;">Quiz<b>C</b><i>a</i>st</div>
+    <button id="castIconBtn" style="width: auto !important; max-width: none !important; background: transparent !important; border: none !important; padding: 4px !important; box-shadow: none !important; cursor: pointer !important; color: var(--dim) !important; display: flex !important; align-items: center !important; justify-content: center !important; transform: none !important; margin: 0 !important;">
+      <svg id="castSvg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+        <path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+      </svg>
+    </button>
+  </div>
 
   <h1>Spiel-Code</h1>
   <div class="code" id="code">······</div>
@@ -136,7 +143,6 @@
 
   <div class="players" id="playerSlots"></div>
 
-  <button id="castBtn">▶ Auf TV casten</button>
   <button id="startBtn" disabled>Spiel starten</button>
   <div id="status"></div>
   
@@ -151,6 +157,39 @@
 
   <div class="live" id="live"></div>
 
+  <!-- Cast Connection Modal -->
+  <div id="castModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 15, 35, 0.95); z-index: 100; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; font-size: 8px;">
+    <div style="background: var(--panel); border: 4px solid var(--line); box-shadow: 6px 6px 0 #000; width: 100%; max-width: 440px; padding: 24px; position: relative;">
+      
+      <!-- Close button -->
+      <button id="closeCastModal" style="position: absolute; top: 12px; right: 12px; width: auto !important; max-width: none !important; padding: 6px 10px !important; font-size: 8px !important; box-shadow: none !important; border-width: 2px !important; margin: 0 !important; background: var(--red) !important; border-color: var(--white) !important; cursor: pointer !important;">X</button>
+      
+      <h3 style="color: var(--gold); font-size: 11px; margin-bottom: 20px; text-transform: uppercase; text-align: center; letter-spacing: 0.1em; font-family: inherit;">★ TV VERBINDEN ★</h3>
+      
+      <!-- Chromecast Option -->
+      <div id="chromecastOption" style="margin-bottom: 24px; border-bottom: 2px dashed var(--line); padding-bottom: 20px; text-align: center;">
+        <div style="color: var(--white); margin-bottom: 12px;">CHROMECAST / GOOGLE CAST:</div>
+        <button id="modalCastBtn" style="font-size: 9px; padding: 12px; background: var(--blue); border-color: var(--white); width: 100%;">Auf TV casten</button>
+      </div>
+
+      <!-- TV Browser Option -->
+      <div style="text-align: center;">
+        <div style="color: var(--white); margin-bottom: 10px;">SMART-TV BROWSER / PC:</div>
+        <div style="color: var(--dim); margin-bottom: 14px; line-height: 1.6;">
+          Öffne diesen Link auf deinem Fernseher:<br>
+          <a id="modalTvUrl" href="#" target="_blank" style="color: var(--gold); font-size: 8px; text-decoration: underline; word-break: break-all;">-</a>
+        </div>
+        
+        <!-- Button to Copy Link -->
+        <button id="copyTvUrlBtn" style="font-size: 8px; padding: 8px 12px; margin-bottom: 16px; width: auto !important; max-width: none !important; border-width: 2px !important; box-shadow: 3px 3px 0 #000 !important;">Link kopieren</button>
+        
+        <div id="modalQrWrap" style="margin: 10px auto 0; width: 120px; height: 120px; border: 4px solid var(--line); background: var(--panel);">
+          <img id="modalQrImg" alt="QR-Code zum Beitreten" style="width: 100%; height: 100%;">
+        </div>
+        <div style="font-size: 6px; color: var(--dim); margin-top: 8px;">Scanne diesen QR-Code mit dem TV, um direkt zu verbinden.</div>
+      </div>
+    </div>
+  </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -320,24 +359,49 @@ socket.on("game_finished", d => {
 });
 socket.on("game_aborted", d => $("status").textContent = "Spiel abgebrochen: " + d.reason);
 
-// ── Chromecast Sender ──────────────────────────────────
-// Cast SDK startet NUR die Receiver-App und uebergibt den Code.
-// Spiellogik laeuft danach komplett ueber Socket.io (Receiver joint selbst als Spectator).
-$("castBtn").onclick = () => {
+// ── TV Verbindung & Modal ──────────────────────────────
+$("castIconBtn").onclick = () => {
   const receiverUrl = location.origin + "/receiver/?code=" + (gameCode || "");
-  // Fallback immer anzeigen – auch wenn Cast vorhanden ist.
-  $("status").innerHTML =
-    "TV-Browser: <b><a href=\"" + receiverUrl + "\" target=\"_blank\" style=\"color:var(--gold);font-family:inherit\">" +
-    receiverUrl + "</a></b>" +
-    "<br><span style='font-size:7px;color:var(--dim)'>oder QR-Code scannen ↑</span>";
+  $("modalTvUrl").textContent = receiverUrl;
+  $("modalTvUrl").href = receiverUrl;
+  $("modalQrImg").src = "/api/qr?url=" + encodeURIComponent(receiverUrl);
+  $("castModal").style.display = "flex";
+};
 
-  if (!window.chrome || !chrome.cast || !castReady) return; // kein Cast SDK -> Fallback reicht
+$("closeCastModal").onclick = () => {
+  $("castModal").style.display = "none";
+};
+
+$("castModal").onclick = (e) => {
+  if (e.target === $("castModal")) {
+    $("castModal").style.display = "none";
+  }
+};
+
+$("copyTvUrlBtn").onclick = () => {
+  const url = $("modalTvUrl").textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    const originalText = $("copyTvUrlBtn").textContent;
+    $("copyTvUrlBtn").textContent = "Kopiert!";
+    setTimeout(() => {
+      $("copyTvUrlBtn").textContent = originalText;
+    }, 1500);
+  }).catch(e => console.error("Kopieren fehlgeschlagen", e));
+};
+
+// ── Chromecast Sender ──────────────────────────────────
+$("modalCastBtn").onclick = () => {
+  if (!window.chrome || !chrome.cast || !castReady) {
+    alert("Chromecast nicht verfügbar oder lädt noch.");
+    return;
+  }
   chrome.cast.requestSession(session => {
     castSession = session;
-    $("castBtn").classList.add("connected");
-    $("castBtn").textContent = "▶ Verbunden mit TV";
+    $("castIconBtn").style.color = "var(--gold)";
+    $("modalCastBtn").textContent = "Verbunden mit TV";
+    $("modalCastBtn").style.backgroundColor = "var(--good)";
     sendCodeToTv();
-  }, err => { /* Cast abgebrochen – Fallback-URL bleibt sichtbar */ });
+  }, err => { /* Cast abgebrochen */ });
 };
 
 function sendCodeToTv() {
@@ -351,7 +415,11 @@ window.__onGCastApiAvailable = (available) => {
   if (!available || CAST_APP_ID.startsWith("REPLACE")) return;
   const config = new chrome.cast.ApiConfig(
     new chrome.cast.SessionRequest(CAST_APP_ID),
-    session => { castSession = session; sendCodeToTv(); },
+    session => {
+      castSession = session;
+      $("castIconBtn").style.color = "var(--gold)";
+      sendCodeToTv();
+    },
     () => {}
   );
   chrome.cast.initialize(config, () => { castReady = true; }, () => {});

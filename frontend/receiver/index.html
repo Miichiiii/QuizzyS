@@ -152,7 +152,17 @@
 <body>
   <div class="brand">Quiz<b>C</b><i>a</i>st</div>
 
-  <div class="screen active" id="s-idle"><div class="msg">Warte auf Verbindung vom Host<span class="blink">▮</span></div></div>
+  <div class="screen active" id="s-idle">
+    <div class="msg" id="idleMsg">Warte auf Verbindung vom Host<span class="blink">▮</span></div>
+    
+    <!-- Manuelle Code-Eingabe falls kein URL-Parameter -->
+    <div id="pairingContainer" style="margin-top: 5vh; display: none; flex-direction: column; align-items: center; background: var(--panel); border: .3vw solid var(--line); padding: 4vh 4vw; box-shadow: .5vw .5vw 0 #000; max-width: 45vw;">
+      <div style="font-size: 1.2vw; color: var(--gold); margin-bottom: 3vh; text-transform: uppercase; text-align: center; font-family: inherit;">TV mit Spiel verbinden</div>
+      <input type="text" id="pairingCodeInput" placeholder="CODE" maxlength="6" style="font-family: inherit; font-size: 2.2vw; text-align: center; text-transform: uppercase; color: var(--white); background: var(--bg); border: .3vw solid var(--line); padding: 1.5vh 2vw; width: 18vw; margin-bottom: 3vh; caret-color: var(--blue); outline: none;">
+      <button id="pairingBtn" style="font-family: inherit; font-size: 1.1vw; color: var(--white); background: var(--good); border: .3vw solid var(--white); padding: 1.5vh 3vw; cursor: pointer; box-shadow: .3vw .3vw 0 #000; text-transform: uppercase;">Verbinden</button>
+      <div id="pairingError" style="color: var(--red); font-size: 0.9vw; margin-top: 2vh; min-height: 1.5vw; text-transform: uppercase; text-align: center;"></div>
+    </div>
+  </div>
 
   <div class="screen" id="s-lobby">
     <div id="lobbyCode">······</div>
@@ -254,9 +264,35 @@ try {
   }
 } catch (e) { /* kein Cast-Kontext -> Browser-Fallback */ }
 
-// ── Weg 2: Browser-Fallback: /receiver/?code=XXXXXX ────
+// ── Weg 2: Browser-Fallback & Pairing ──────────────────
 const urlCode = new URLSearchParams(location.search).get("code");
-if (urlCode) socket.on("connect", () => joinRoom(urlCode));
+if (urlCode) {
+  socket.on("connect", () => joinRoom(urlCode));
+} else {
+  // Zeige das Pairing-Formular auf dem TV-Bildschirm an
+  $("idleMsg").style.display = "none";
+  $("pairingContainer").style.display = "flex";
+  
+  $("pairingBtn").onclick = () => {
+    const codeVal = $("pairingCodeInput").value.trim().toUpperCase();
+    if (codeVal.length !== 6) {
+      $("pairingError").textContent = "Code muss 6-stellig sein.";
+      return;
+    }
+    $("pairingError").textContent = "";
+    socket.emit("join_as_spectator", { code: codeVal }, res => {
+      if (!res.ok) {
+        $("pairingError").textContent = "Fehler: " + res.error;
+      } else {
+        joined = true;
+        $('lobbyCode').textContent = codeVal;
+        const playerUrl = location.origin + '/player/?code=' + codeVal;
+        $('lobbyQrImg').src = '/api/qr?url=' + encodeURIComponent(playerUrl);
+        show('s-lobby');
+      }
+    });
+  };
+}
 
 // ── Spielanzeige ───────────────────────────────────────
 let activePlayers = [];
@@ -392,7 +428,16 @@ socket.on("game_finished", ({ players, winner }) => {
 });
 
 socket.on("game_aborted", ({ reason }) => {
-  $("s-idle").querySelector(".msg").textContent = "Spiel abgebrochen: " + reason;
+  joined = false;
+  if (urlCode) {
+    $("idleMsg").style.display = "block";
+    $("idleMsg").textContent = "Spiel abgebrochen: " + reason;
+    $("pairingContainer").style.display = "none";
+  } else {
+    $("idleMsg").style.display = "none";
+    $("pairingContainer").style.display = "flex";
+    $("pairingError").textContent = "Spiel abgebrochen: " + reason;
+  }
   show("s-idle");
 });
 
