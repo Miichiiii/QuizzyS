@@ -449,8 +449,18 @@ function sendCodeToTv() {
 }
 
 window.__onGCastApiAvailable = (available) => {
-  if (!available || !CAST_APP_ID || CAST_APP_ID.startsWith("REPLACE")) return;
-  
+  if (!available) {
+    console.warn("Cast: API nicht verfügbar (Browser unterstützt kein Google Cast).");
+    $("chromecastHelpText").innerHTML =
+      'Cast-API in diesem Browser nicht verfügbar.<br>' +
+      '<span style="color: var(--gold);">Bitte Google Chrome (Desktop/Android) verwenden.</span>';
+    return;
+  }
+  if (!CAST_APP_ID || CAST_APP_ID.startsWith("REPLACE")) {
+    console.warn("Cast: CAST_APP_ID fehlt oder ist Platzhalter:", CAST_APP_ID);
+    return;
+  }
+
   castContext = cast.framework.CastContext.getInstance();
   castContext.setOptions({
     receiverApplicationId: CAST_APP_ID,
@@ -462,6 +472,7 @@ window.__onGCastApiAvailable = (available) => {
     event => {
       switch (event.sessionState) {
         case cast.framework.SessionState.SESSION_STARTED:
+        case cast.framework.SessionState.SESSION_RESUMED:
           castSession = castContext.getCurrentSession();
           $("castIconBtn").style.color = "var(--gold)";
           $("modalCastBtn").textContent = "Verbunden mit TV";

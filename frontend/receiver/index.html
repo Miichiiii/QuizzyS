@@ -297,6 +297,10 @@
     </div>
   </div>
 
+<!-- CAF Receiver SDK MUSS vor dem Inline-Script geladen sein, sonst ist
+     window.cast beim Check unten immer undefined und ctx.start() wird nie
+     aufgerufen -> Chromecast beendet die App nach wenigen Sekunden. -->
+<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -625,7 +629,5 @@ socket.on("speed_changed", ({ speed }) => {
 // Start initialization on window load
 window.addEventListener("load", initAudio);
 </script>
-<!-- CAF Receiver SDK: laedt nur auf dem Chromecast wirklich, im Browser harmlos -->
-<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </body>
 </html>
