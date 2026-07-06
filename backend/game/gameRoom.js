@@ -61,6 +61,10 @@ class GameRoom {
     this.io.to(this.code).emit(event, data);
   }
 
+  broadcastTv(event, data) {
+    this.spectators.forEach(s => this.io.to(s).emit(event, data));
+  }
+
   setHost(socketId) {
     this.hostSocketId = socketId;
     this.state = "WAITING_FOR_PLAYERS";
@@ -82,6 +86,7 @@ class GameRoom {
     this.spectators.add(socketId);
     // Spectator bekommt den aktuellen Lobby-Stand sofort, egal wann er joint.
     this.io.to(socketId).emit("player_joined", { players: this.publicPlayers(), maxPlayers: this.maxPlayers });
+    this.io.to(socketId).emit("tv_state", this._tvSnapshot());
     // Audio initialisieren
     this.io.to(socketId).emit("init_audio_settings", { volume: this.musicVolume, speed: this.musicSpeed });
   }
@@ -183,6 +188,25 @@ class GameRoom {
     return base;
   }
 
+  _tvSnapshot() {
+    const base = { view: this.state === "LOBBY" || this.state === "WAITING_FOR_PLAYERS" ? "LOBBY" : this.state, joinUrl: getJoinUrl(), playerCount: this.players.length };
+    if (this.state === "QUESTION_ACTIVE" || this.state === "ANSWER_LOCKED") {
+      const q = this.questions[this.currentIndex];
+      return { ...base, view: 'QUESTION', question: { question: q.question, answers: q.answers }, 
+               endsAt: this.questionStartedAt + (q.timeLimit * 1000), 
+               playerCount: this.players.length, answerCount: Object.keys(this.answers).length };
+    }
+    if (this.state === "SHOW_RESULT") {
+      const q = this.questions[this.currentIndex];
+      return { ...base, view: 'REVEAL', question: { question: q.question, answers: q.answers },
+               correctIndex: q.correctIndex, answerCount: Object.keys(this.answers).length, playerCount: this.players.length };
+    }
+    if (this.state === "SCOREBOARD" || this.state === "GAME_FINISHED") {
+      return { ...base, view: 'FINISHED', ranking: this.publicPlayers().sort((a,b)=>b.score - a.score) };
+    }
+    return { ...base, view: 'LOBBY' };
+  }
+
   publicPlayers() {
     return this.players.map(p => ({ name: p.name, color: p.color, score: p.score }));
   }
@@ -259,6 +283,7 @@ class GameRoom {
 
     this.answers[socketId] = { index: idx, ms: Date.now() - this.questionStartedAt };
     this.streamer.updateAnswerCount(Object.keys(this.answers).length, this.players.length);
+    this.broadcastTv("tv_answers", { answerCount: Object.keys(this.answers).length, playerCount: this.players.length });
     // lock_answer: TV zeigt "Blau hat geantwortet", Gegner sieht "Warte auf Gegner".
     // KEINE Info, WAS geantwortet wurde, und keine Scores waehrend aktiver Frage.
     this.broadcast("lock_answer", { color: player.color });
@@ -335,6 +360,7 @@ class GameRoom {
     }));
     
     this.streamer.showFinished(this.publicPlayers().sort((a,b)=>b.score - a.score));
+    this.broadcastTv("tv_finished", { ranking: this.publicPlayers().sort((a,b)=>b.score - a.score) });
     this.broadcast("game_finished", { players: this.publicPlayers(), winner, log: finalLog });
     
     // Kill streamer after 10 seconds of scoreboard

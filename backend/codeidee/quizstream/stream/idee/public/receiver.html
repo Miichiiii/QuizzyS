@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuizStream — Cast Receiver</title>
+<style>
+  :root {
+    --bg: #101828; --panel: #2a3550; --text: #eef2f8;
+    --dim: #8ea0bd; --accent: #35d07f;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .screen { display: none; flex-direction: column; height: 100vh; padding: 4vh 5vw; }
+  .top { display: flex; justify-content: space-between; color: var(--dim);
+         font-size: 3.2vh; font-weight: 700; letter-spacing: .05em; }
+  .barwrap { height: 1.4vh; background: var(--panel); border-radius: 1vh; margin: 2vh 0 3vh; overflow: hidden; }
+  #tv-bar { height: 100%; background: var(--accent); width: 100%; transition: width .2s linear; }
+  #tv-qtext { font-size: 6.5vh; font-weight: 800; line-height: 1.25; flex: 1; display: flex; align-items: center; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5vh; margin-bottom: 2vh; }
+  .tv-opt {
+    background: var(--panel); border-radius: 1.5vh; padding: 4vh 3vh;
+    font-size: 4.5vh; font-weight: 700; display: flex; gap: 2.5vh; align-items: center;
+  }
+  .tv-opt .letter { color: var(--accent); font-weight: 800; }
+  .tv-opt.correct { background: var(--accent); color: #06281a; }
+  .tv-opt.correct .letter { color: #06281a; }
+  #tv-answers { text-align: right; color: var(--dim); font-size: 3vh; }
+  /* Lobby */
+  #tv-lobby { justify-content: center; align-items: center; text-align: center; gap: 3vh; }
+  #tv-lobby h1 { font-size: 5vh; color: var(--dim); letter-spacing: .15em; }
+  #tv-join-url { font-size: 6vh; font-weight: 800; color: var(--accent); word-break: break-all; }
+  #tv-player-count { font-size: 4vh; }
+  /* Final */
+  #tv-final { justify-content: center; align-items: center; gap: 3vh; }
+  #tv-final h1 { font-size: 7vh; }
+  #tv-board { width: 60vw; }
+  .tv-row { display: flex; justify-content: space-between; font-size: 4.5vh;
+            font-weight: 700; padding: 1.5vh 0; border-bottom: 2px solid var(--panel); }
+  .tv-row:first-child { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="screen" id="tv-lobby" style="display:flex">
+  <h1>QUIZ LOBBY</h1>
+  <div>Mitspielen:</div>
+  <div id="tv-join-url">…</div>
+  <div id="tv-player-count">Spieler: 0</div>
+</div>
+
+<div class="screen" id="tv-question">
+  <div class="top"><span id="tv-qnum"></span><span id="tv-timer"></span></div>
+  <div class="barwrap"><div id="tv-bar"></div></div>
+  <div id="tv-qtext"></div>
+  <div class="grid" id="tv-opts"></div>
+  <div id="tv-answers"></div>
+</div>
+
+<div class="screen" id="tv-final">
+  <h1>Endstand</h1>
+  <div id="tv-board"></div>
+</div>
+
+<script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<script>
+  // Custom Cast Receiver: haelt die Cast-Session am Leben, waehrend
+  // tv-view.js den Spielzustand per Socket.io rendert.
+  var ctx = cast.framework.CastReceiverContext.getInstance();
+  var opts = new cast.framework.CastReceiverOptions();
+  opts.disableIdleTimeout = true; // Quiz laeuft ohne Media-Playback weiter
+  ctx.start(opts);
+</script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/tv-view.js"></script>
+</body>
+</html>
