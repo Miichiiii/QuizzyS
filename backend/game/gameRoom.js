@@ -10,7 +10,9 @@ const { getCategories, getQuestionsForCategory } = require("./questions");
 const { Streamer } = require("../streamer");
 const os = require('os');
 const PORT = parseInt(process.env.PORT || "3000", 10);
-const STREAM_DELAY = parseInt(process.env.STREAM_DELAY || "6000", 10);
+// Standardmäßig 0 für Zero-Latency (Web-Receiver/Tab-Cast).
+// Für echtes HLS per App auf 6000 setzen (z.B. per Env-Variable STREAM_DELAY=6000)
+const STREAM_DELAY = parseInt(process.env.STREAM_DELAY || "0", 10);
 
 function getJoinUrl(origin) {
   if (origin) return origin + "/player";
