@@ -113,7 +113,7 @@ io.on("connection", (socket) => {
   // Host erstellt Spiel
   socket.on("create_game", (payload, cb) => {
     const code = makeCode();
-    const room = new GameRoom(code, io);
+    const room = new GameRoom(code, io, payload?.origin);
     room.setHost(socket.id);
     // v2: Highscore nach Spielende in DB schreiben.
     room.onFinish = (players, winner) => {

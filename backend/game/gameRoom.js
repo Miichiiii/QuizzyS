@@ -12,7 +12,8 @@ const os = require('os');
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const STREAM_DELAY = parseInt(process.env.STREAM_DELAY || "6000", 10);
 
-function getJoinUrl() {
+function getJoinUrl(origin) {
+  if (origin) return origin + "/player";
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
@@ -33,7 +34,8 @@ const QUESTIONS_PER_GAME = 5;
 const COLORS = ["blau", "rot", "gruen", "gelb", "orange", "pink", "violett", "cyan", "braun", "weiss"];
 
 class GameRoom {
-  constructor(code, io) {
+  constructor(code, io, origin) {
+    this.origin = origin;
     this.code = code;
     this.io = io; // socket.io Server-Instanz
     this.state = "LOBBY";
@@ -68,7 +70,7 @@ class GameRoom {
   setHost(socketId) {
     this.hostSocketId = socketId;
     this.state = "WAITING_FOR_PLAYERS";
-    this.streamer.showLobby(getJoinUrl(), this.players.length);
+    this.streamer.showLobby(getJoinUrl(this.origin), this.players.length);
   }
 
   addPlayer(socketId, name) {
@@ -168,6 +170,7 @@ class GameRoom {
   // Liefert einen Snapshot des aktuellen Spielstands fuer den reconnecteten Spieler.
   _stateSnapshot() {
     const base = { state: this.state, players: this.publicPlayers(), maxPlayers: this.maxPlayers };
+    if (this.state === "CATEGORY_SELECT") return { ...base, view: 'CATEGORY', chooserName: this.players[0].name };
     if (this.state === "QUESTION_ACTIVE" || this.state === "ANSWER_LOCKED") {
       const q = this.questions[this.currentIndex];
       const elapsed = Math.floor((Date.now() - this.questionStartedAt) / 1000);
@@ -189,7 +192,7 @@ class GameRoom {
   }
 
   _tvSnapshot() {
-    const base = { view: this.state === "LOBBY" || this.state === "WAITING_FOR_PLAYERS" ? "LOBBY" : this.state, joinUrl: getJoinUrl(), playerCount: this.players.length };
+    const base = { view: this.state === "LOBBY" || this.state === "WAITING_FOR_PLAYERS" ? "LOBBY" : (this.state === "CATEGORY_SELECT" ? "CATEGORY" : this.state), joinUrl: getJoinUrl(this.origin), playerCount: this.players.length };
     if (this.state === "QUESTION_ACTIVE" || this.state === "ANSWER_LOCKED") {
       const q = this.questions[this.currentIndex];
       return { ...base, view: 'QUESTION', question: { question: q.question, answers: q.answers }, 
@@ -221,6 +224,7 @@ class GameRoom {
     this.broadcast("game_starting", { players: this.publicPlayers() });
     // Blauer Spieler (Spieler 1) waehlt die Kategorie.
     this.streamer.showCategorySelect(this.players[0].name);
+    this.broadcastTv("tv_category_select", { chooserName: this.players[0].name });
     this.broadcast("category_select", {
       chooserColor: "blau",
       chooserName: this.players[0].name,

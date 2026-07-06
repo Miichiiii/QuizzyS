@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const ffmpegPath = require('ffmpeg-static');
 const path = require('path');
 const fs = require('fs');
 const { Canvas } = require('skia-canvas');
@@ -56,8 +57,10 @@ class Streamer {
       path.join(this.hlsDir, 'stream.m3u8')
     ];
     
-    this.proc = spawn('ffmpeg', args, { stdio: ['pipe', 'ignore', 'pipe'] });
-    this.proc.stderr.on('data', d => process.stderr.write(`[ffmpeg ${this.roomCode}] ` + d));
+    this.proc = spawn(ffmpegPath, args, { stdio: ['pipe', 'ignore', 'pipe'] });
+    
+    this.proc.stderr.on('data', data => {}); // console.log('FFmpeg:', data.toString()));
+    this.proc.on('error', (err) => console.error('FFmpeg spawn error:', err));
     this.proc.on('exit', code => {
       console.log(`[streamer ${this.roomCode}] ffmpeg beendet, code`, code);
       this.stop();

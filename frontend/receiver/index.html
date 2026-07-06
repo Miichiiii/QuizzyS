@@ -53,6 +53,10 @@
     .lobby-title { font-size: 64px; margin-bottom: 20px; }
     .lobby-url { font-size: 40px; color: var(--dim); margin-bottom: 40px; }
     
+    /* Category */
+    #viewCategory { text-align: center; }
+    #viewCategory h1 { font-size: 64px; color: var(--green); margin-bottom: 20px; }
+    #viewCategory h2 { font-size: 48px; color: var(--white); }
     /* Question */
     .question-text { font-size: 48px; margin-bottom: 60px; }
     .answers-grid {
@@ -120,6 +124,11 @@
       <div style="font-size: 36px; color: var(--green);">Warte auf den Host...</div>
     </div>
     
+    <!-- CATEGORY -->
+    <div id="viewCategory" class="view">
+      <h1>KATEGORIE-WAHL</h1>
+      <h2 id="chooserText">Spieler wählt...</h2>
+    </div>
     <!-- QUESTION / REVEAL -->
     <div id="viewQuestion" class="view">
       <div class="question-text" id="qText"></div>
@@ -140,6 +149,7 @@
     
     const views = {
       LOBBY: document.getElementById('viewLobby'),
+      CATEGORY: document.getElementById('viewCategory'),
       QUESTION: document.getElementById('viewQuestion'),
       FINISHED: document.getElementById('viewFinished')
     };
@@ -164,6 +174,9 @@
         document.getElementById('lobbyUrl').innerText = `Handy: ${state.joinUrl}`;
         document.getElementById('statsInfo').innerText = `Spieler: ${state.playerCount}`;
         document.getElementById('centerInfo').innerText = '';
+      } else if (state.view === 'CATEGORY') {
+        showView('CATEGORY');
+        document.getElementById('chooserText').innerText = state.chooserName + " wählt gerade eine Kategorie aus...";
       }
     });
 
@@ -174,6 +187,13 @@
       document.getElementById('centerInfo').innerText = '';
     });
 
+    socket.on('tv_category_select', data => {
+      showView('CATEGORY');
+      document.getElementById('chooserText').innerText = data.chooserName + " wählt gerade eine Kategorie aus...";
+      document.getElementById('statsInfo').innerText = "";
+      document.getElementById('centerInfo').innerText = "";
+    });
+    
     socket.on('tv_question', data => {
       showView('QUESTION');
       document.getElementById('qText').innerText = data.question.question;

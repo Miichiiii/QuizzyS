@@ -251,7 +251,7 @@ $("playerUrl").textContent = location.origin + "/player/";
 // Spiel erstellen sobald verbunden
 socket.on("connect", () => {
   if (gameCode) return; // kein Doppel-Create bei Socket-Reconnect
-  socket.emit("create_game", {}, res => {
+  socket.emit("create_game", { origin: location.origin }, res => {
     if (!res.ok) { $("status").textContent = "Fehler beim Erstellen."; return; }
     gameCode = res.code;
     $("code").textContent = gameCode;
@@ -444,6 +444,18 @@ $("modalCastBtn").onclick = () => {
     });
 };
 
+function sendMediaToTv() {
+  if (castSession && gameCode) {
+    const mediaInfo = new chrome.cast.media.MediaInfo(window.location.origin + "/hls/" + gameCode.toUpperCase() + "/stream.m3u8", "application/x-mpegurl");
+    mediaInfo.streamType = chrome.cast.media.StreamType.LIVE;
+    
+    const request = new chrome.cast.media.LoadRequest(mediaInfo);
+    castSession.loadMedia(request).then(
+      function() { console.log('Load succeed'); },
+      function(errorCode) { console.log('Error code: ' + errorCode); }
+    );
+  }
+}
 function sendCodeToTv() {
   if (castSession && gameCode) {
     castSession.sendMessage(CAST_NAMESPACE, { code: gameCode }, () => {}, () => {});
