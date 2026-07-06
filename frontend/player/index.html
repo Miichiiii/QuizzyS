@@ -159,6 +159,12 @@ const socket = io();
 const $ = id => document.getElementById(id);
 let myColor = null, gameCode = null, myName = null, answered = false;
 
+// URL Code Pre-fill
+const urlCode = new URLSearchParams(location.search).get("code");
+if (urlCode && urlCode.length === 6) {
+  $("code").value = urlCode.toUpperCase();
+}
+
 function show(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   $(id).classList.add("active");

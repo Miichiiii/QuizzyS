@@ -141,6 +141,15 @@
     </div>
   </div>
 
+  <!-- Als Spieler mitspielen -->
+  <div id="playShortcut" style="margin: 12px 0 24px; font-size: 8px; background: var(--panel); padding: 16px; border: 4px solid var(--line); box-shadow: 4px 4px 0 #000; width: 100%; max-width: 480px;">
+    <h3 style="color: var(--gold); font-size: 9px; margin-bottom: 14px; text-transform: uppercase; text-align: center;">★ Als Spieler mitspielen ★</h3>
+    <div style="color: var(--dim); margin-bottom: 14px; line-height: 1.6; text-align: center;">
+      Du möchtest selbst als Spieler 1 teilnehmen? Öffne den Beitritts-Tab in einem neuen Fenster:
+    </div>
+    <button id="openPlayerBtn" style="font-size: 9px; padding: 12px; background: var(--blue); border-color: var(--white); width: 100%;">Spieler-Tab öffnen</button>
+  </div>
+
   <div class="players" id="playerSlots"></div>
 
   <button id="startBtn" disabled>Spiel starten</button>
@@ -178,7 +187,7 @@
       </div>
 
       <!-- TV Browser Option -->
-      <div style="text-align: center;">
+      <div style="text-align: center; border-bottom: 2px dashed var(--line); padding-bottom: 20px; margin-bottom: 20px;">
         <div style="color: var(--white); margin-bottom: 10px;">SMART-TV BROWSER / PC:</div>
         <div style="color: var(--dim); margin-bottom: 14px; line-height: 1.6;">
           Öffne diesen Link auf deinem Fernseher:<br>
@@ -192,6 +201,18 @@
           <img id="modalQrImg" alt="QR-Code zum Beitreten" style="width: 100%; height: 100%;">
         </div>
         <div style="font-size: 6px; color: var(--dim); margin-top: 8px;">Scanne diesen QR-Code mit dem TV, um direkt zu verbinden.</div>
+      </div>
+
+      <!-- Chromecast Tab Casting Guide -->
+      <div style="text-align: center;">
+        <div style="color: var(--white); margin-bottom: 10px; text-transform: uppercase;">CHROMECAST-STICK (Tab spiegeln):</div>
+        <div style="color: var(--dim); margin-bottom: 6px; line-height: 1.6; font-size: 7px; text-align: left;">
+          Falls du keinen Smart-TV Browser hast, kannst du den Tab einfach als Video-Stream übertragen:<br><br>
+          1. Öffne den TV-Link (oben) auf deinem Laptop/PC in Google Chrome.<br>
+          2. Klicke oben rechts im Chrome-Menü (3 Punkte) auf <b>"Speichern und teilen" &rarr; "Übertragen..."</b>.<br>
+          3. Wähle deinen Chromecast-Stick aus.<br><br>
+          Der Browser codiert den Tab nun live als Video-Stream und zeigt ihn perfekt auf dem TV an!
+        </div>
       </div>
     </div>
   </div>
@@ -403,19 +424,22 @@ $("copyTvUrlBtn").onclick = () => {
   }).catch(e => console.error("Kopieren fehlgeschlagen", e));
 };
 
-// ── Chromecast Sender ──────────────────────────────────
+// ── Chromecast Sender (CAF SDK) ────────────────────────
+let castContext = null;
+let castReady = false;
+
 $("modalCastBtn").onclick = () => {
-  if (!window.chrome || !chrome.cast || !castReady) {
+  if (!castReady || !castContext) {
     alert("Chromecast nicht verfügbar oder lädt noch.");
     return;
   }
-  chrome.cast.requestSession(session => {
-    castSession = session;
-    $("castIconBtn").style.color = "var(--gold)";
-    $("modalCastBtn").textContent = "Verbunden mit TV";
-    $("modalCastBtn").style.backgroundColor = "var(--good)";
-    sendCodeToTv();
-  }, err => { /* Cast abgebrochen */ });
+  castContext.requestSession()
+    .then(() => {
+      // Erfolg wird im SESSION_STATE_CHANGED Listener behandelt
+    })
+    .catch(err => {
+      console.log("Cast session request error or cancelled:", err);
+    });
 };
 
 function sendCodeToTv() {
@@ -424,23 +448,48 @@ function sendCodeToTv() {
   }
 }
 
-let castReady = false;
 window.__onGCastApiAvailable = (available) => {
   if (!available || !CAST_APP_ID || CAST_APP_ID.startsWith("REPLACE")) return;
-  const config = new chrome.cast.ApiConfig(
-    new chrome.cast.SessionRequest(CAST_APP_ID),
-    session => {
-      castSession = session;
-      $("castIconBtn").style.color = "var(--gold)";
-      sendCodeToTv();
-    },
-    () => {}
+  
+  castContext = cast.framework.CastContext.getInstance();
+  castContext.setOptions({
+    receiverApplicationId: CAST_APP_ID,
+    autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+  });
+  
+  castContext.addEventListener(
+    cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+    event => {
+      switch (event.sessionState) {
+        case cast.framework.SessionState.SESSION_STARTED:
+          castSession = castContext.getCurrentSession();
+          $("castIconBtn").style.color = "var(--gold)";
+          $("modalCastBtn").textContent = "Verbunden mit TV";
+          $("modalCastBtn").style.backgroundColor = "var(--good)";
+          sendCodeToTv();
+          break;
+        case cast.framework.SessionState.SESSION_ENDED:
+          castSession = null;
+          $("castIconBtn").style.color = "var(--dim)";
+          $("modalCastBtn").textContent = "Auf TV casten";
+          $("modalCastBtn").style.backgroundColor = "var(--blue)";
+          break;
+      }
+    }
   );
-  chrome.cast.initialize(config, () => {
-    castReady = true;
-    $("modalCastBtn").style.display = "block";
-    $("chromecastHelpText").style.display = "none";
-  }, () => {});
+  
+  castReady = true;
+  $("modalCastBtn").style.display = "block";
+  $("chromecastHelpText").style.display = "none";
+};
+
+// Spieler Tab Button Handler
+$("openPlayerBtn").onclick = () => {
+  if (gameCode) {
+    window.open("/player/?code=" + gameCode, "_blank");
+  } else {
+    alert("Das Spiel wurde noch nicht erstellt. Bitte warte einen Moment.");
+  }
 };
 </script>
 </body>
