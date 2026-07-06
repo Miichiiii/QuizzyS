@@ -242,20 +242,32 @@
       });
     });
 
+    socket.on('tv_scoreboard', data => {
+      if (timerInterval) clearInterval(timerInterval);
+      showView('FINISHED');
+      const box = document.getElementById('rankingList');
+      box.innerHTML = '';
+      data.ranking.forEach((p, i) => {
+        const row = document.createElement('div');
+        row.className = 'rank-row';
+        row.innerHTML = `<span style="color:var(--${p.color})">${i+1}. ${p.name}</span><span>${p.score} Pkt</span>`;
+        box.appendChild(row);
+      });
+      document.getElementById('centerInfo').innerText = "ZWISCHENSTAND";
+    });
+
     socket.on('tv_finished', data => {
       if (timerInterval) clearInterval(timerInterval);
       showView('FINISHED');
-      document.getElementById('centerInfo').innerText = "ENDE";
-      document.getElementById('statsInfo').innerText = "";
-      
-      const list = document.getElementById('rankingList');
-      list.innerHTML = '';
-      data.ranking.slice(0, 5).forEach((r, i) => {
+      const box = document.getElementById('rankingList');
+      box.innerHTML = '';
+      data.ranking.forEach((p, i) => {
         const row = document.createElement('div');
         row.className = 'rank-row';
-        row.innerHTML = `<span>${i+1}. ${r.name}</span><span>${r.score}</span>`;
-        list.appendChild(row);
+        row.innerHTML = `<span style="color:var(--${p.color})">${i+1}. ${p.name}</span><span>${p.score} Pkt</span>`;
+        box.appendChild(row);
       });
+      document.getElementById('centerInfo').innerText = "ENDSTAND";
     });
   </script>
 </body>

@@ -58,7 +58,7 @@ class Streamer {
     ];
     
     this.proc = spawn(ffmpegPath, args, { stdio: ['pipe', 'ignore', 'pipe'] });
-    
+    this.proc.stdin.on('error', (err) => { /* ignore stdin errors */ });
     this.proc.stderr.on('data', data => {}); // console.log('FFmpeg:', data.toString()));
     this.proc.on('error', (err) => console.error('FFmpeg spawn error:', err));
     this.proc.on('exit', code => {

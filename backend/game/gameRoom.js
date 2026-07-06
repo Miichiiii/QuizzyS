@@ -253,27 +253,41 @@ class GameRoom {
     const q = this.questions[this.currentIndex];
     this.answers = {};
     this.state = "QUESTION_ACTIVE";
-    this.questionStartedAt = Date.now();
+    this.questionStartedAt = Date.now() + STREAM_DELAY;
 
-    // correctIndex wird hier BEWUSST NICHT mitgesendet.
-    this.broadcast("next_question", {
-      index: this.currentIndex + 1,
-      total: this.questions.length,
-      category: q.category,
-      question: q.question,
-      answers: q.answers,
-      timeLimit: q.timeLimit
+    this.streamer.showQuestion(q, q.timeLimit, 0, this.players.length);
+    this.broadcastTv("tv_question", {
+      question: { question: q.question, answers: q.answers },
+      endsAt: Date.now() + STREAM_DELAY + (q.timeLimit * 1000),
+      playerCount: this.players.length
     });
 
-    // Serverseitiger Timer, broadcast timer_tick jede Sekunde.
-    let remaining = q.timeLimit;
-    this.broadcast("timer_tick", { remaining });
     this.clearTimers();
-    this.tickInterval = setInterval(() => {
-      remaining--;
+    this.pendingTimeout = setTimeout(() => {
+      this.broadcast("next_question", {
+        index: this.currentIndex + 1,
+        total: this.questions.length,
+        category: q.category,
+        question: q.question,
+        answers: q.answers,
+        timeLimit: q.timeLimit
+      });
+
+      let remaining = q.timeLimit;
       this.broadcast("timer_tick", { remaining });
-      if (remaining <= 0) this.lockAndReveal();
-    }, 1000);
+      this.tickInterval = setInterval(() => {
+        remaining--;
+        this.broadcast("timer_tick", { remaining });
+        if (remaining <= 0) this.lockAndReveal();
+      }, 1000);
+    }, STREAM_DELAY);
+    
+    if (this._timers) {
+      this._timers.forEach(t => clearTimeout(t));
+    } else {
+      this._timers = [];
+    }
+    this._timers.push(this.pendingTimeout);
   }
 
   submitAnswer(socketId, answerIndex) {
@@ -326,13 +340,28 @@ class GameRoom {
 
     // JETZT (und erst jetzt) verlaesst correctIndex den Server.
     this.state = "SHOW_RESULT";
+    
+    // TV aktualisieren
+    this.streamer.showReveal(q, q.correctIndex, Object.keys(this.answers).length, this.players.length);
+    this.broadcastTv("tv_reveal", {
+      correctIndex: q.correctIndex,
+      answerCount: Object.keys(this.answers).length,
+      playerCount: this.players.length
+    });
+    
+    // Handys aktualisieren
     this.broadcast("reveal_answer", { correctIndex: q.correctIndex, results });
 
     this.pendingTimeout = setTimeout(() => {
       this.state = "SCOREBOARD";
+      this.streamer.showFinished(this.publicPlayers().sort((a,b)=>b.score - a.score));
+      this.broadcastTv("tv_scoreboard", { ranking: this.publicPlayers().sort((a,b)=>b.score - a.score) });
       this.broadcast("update_score", { players: this.publicPlayers() });
+      
       this.pendingTimeout = setTimeout(() => this.nextQuestion(), SCOREBOARD_MS);
+      if (this._timers) this._timers.push(this.pendingTimeout);
     }, SHOW_RESULT_MS);
+    if (this._timers) this._timers.push(this.pendingTimeout);
   }
 
   finish() {
