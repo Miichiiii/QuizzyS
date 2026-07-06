@@ -465,7 +465,7 @@ window.__onGCastApiAvailable = (available) => {
 
   castContext = cast.framework.CastContext.getInstance();
   castContext.setOptions({
-    receiverApplicationId: CAST_APP_ID,
+    receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
     autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
   });
   
@@ -479,7 +479,7 @@ window.__onGCastApiAvailable = (available) => {
           $("castIconBtn").style.color = "var(--gold)";
           $("modalCastBtn").textContent = "Verbunden mit TV";
           $("modalCastBtn").style.backgroundColor = "var(--good)";
-          sendCodeToTv();
+          sendMediaToTv();
           break;
         case cast.framework.SessionState.SESSION_ENDED:
           castSession = null;

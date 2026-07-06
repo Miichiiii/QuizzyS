@@ -7,6 +7,22 @@
 // v2: Reconnect – Spieler-Disconnect pausiert Raum 60s, kein sofortiger Kill.
 
 const { getCategories, getQuestionsForCategory } = require("./questions");
+const { Streamer } = require("../streamer");
+const os = require('os');
+const PORT = parseInt(process.env.PORT || "3000", 10);
+const STREAM_DELAY = parseInt(process.env.STREAM_DELAY || "6000", 10);
+
+function getJoinUrl() {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return `http://${net.address}:${PORT}/player`;
+      }
+    }
+  }
+  return `http://localhost:${PORT}/player`;
+}
 
 // Delays konfigurierbar, damit der Smoke-Test nicht 30s wartet. Kostet nichts, hilft viel.
 const SHOW_RESULT_MS = parseInt(process.env.SHOW_RESULT_MS || "3000", 10);
@@ -21,6 +37,8 @@ class GameRoom {
     this.code = code;
     this.io = io; // socket.io Server-Instanz
     this.state = "LOBBY";
+    this.streamer = new Streamer(code);
+    this.streamer.start();
     this.hostSocketId = null;
     this.players = []; // { socketId, name, color, score }
     this.spectators = new Set(); // Socket-IDs (TV/Receiver). Senden NIE Daten zurueck.
@@ -46,6 +64,7 @@ class GameRoom {
   setHost(socketId) {
     this.hostSocketId = socketId;
     this.state = "WAITING_FOR_PLAYERS";
+    this.streamer.showLobby(getJoinUrl(), this.players.length);
   }
 
   addPlayer(socketId, name) {
@@ -177,6 +196,7 @@ class GameRoom {
     this.state = "CATEGORY_SELECT";
     this.broadcast("game_starting", { players: this.publicPlayers() });
     // Blauer Spieler (Spieler 1) waehlt die Kategorie.
+    this.streamer.showCategorySelect(this.players[0].name);
     this.broadcast("category_select", {
       chooserColor: "blau",
       chooserName: this.players[0].name,
@@ -238,6 +258,7 @@ class GameRoom {
     if (isNaN(idx) || idx < 0 || idx > 3) return { ok: false, error: "Ungültige Antwort." };
 
     this.answers[socketId] = { index: idx, ms: Date.now() - this.questionStartedAt };
+    this.streamer.updateAnswerCount(Object.keys(this.answers).length, this.players.length);
     // lock_answer: TV zeigt "Blau hat geantwortet", Gegner sieht "Warte auf Gegner".
     // KEINE Info, WAS geantwortet wurde, und keine Scores waehrend aktiver Frage.
     this.broadcast("lock_answer", { color: player.color });
@@ -313,7 +334,11 @@ class GameRoom {
       correctIndex: q.correctIndex
     }));
     
+    this.streamer.showFinished(this.publicPlayers().sort((a,b)=>b.score - a.score));
     this.broadcast("game_finished", { players: this.publicPlayers(), winner, log: finalLog });
+    
+    // Kill streamer after 10 seconds of scoreboard
+    setTimeout(() => { this.streamer.stop(); }, 10000);
     // v2: Optionaler Callback fuer Persistenz (DB-Schreiben in server.js, nicht hier).
     if (typeof this.onFinish === "function") this.onFinish(this.publicPlayers(), winner);
   }
@@ -321,6 +346,10 @@ class GameRoom {
   clearTimers() {
     if (this.tickInterval) { clearInterval(this.tickInterval); this.tickInterval = null; }
     if (this.pendingTimeout) { clearTimeout(this.pendingTimeout); this.pendingTimeout = null; }
+    if (this._timers) {
+      this._timers.forEach(t => clearTimeout(t));
+      this._timers = [];
+    }
   }
 
   // Raum aufraeumen. Laedt alle laufenden Reconnect-Timer ab.
@@ -330,6 +359,7 @@ class GameRoom {
       clearTimeout(entry.reconnectTimer);
     }
     this.disconnectedPlayers.clear();
+    this.streamer.stop();
     this.broadcast("game_aborted", { reason });
   }
 }

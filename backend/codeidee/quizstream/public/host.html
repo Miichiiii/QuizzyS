@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuizStream — Host</title>
+<style>
+  :root {
+    --bg: #101828; --panel: #1b2436; --line: #2a3550;
+    --text: #eef2f8; --dim: #8ea0bd; --accent: #35d07f;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    padding: 24px; max-width: 760px; margin: 0 auto;
+  }
+  h1 { font-size: 1.1rem; letter-spacing: .12em; color: var(--dim); text-transform: uppercase; margin-bottom: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { font-size: .85rem; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+  .state { font-size: 1.6rem; font-weight: 800; }
+  .meta { color: var(--dim); margin-top: 6px; }
+  code { background: var(--bg); padding: 2px 8px; border-radius: 6px; font-size: .9em; word-break: break-all; }
+  .btns { display: flex; gap: 10px; flex-wrap: wrap; }
+  button {
+    padding: 12px 20px; font-size: 1rem; font-weight: 700;
+    border: none; border-radius: 10px; background: var(--accent); color: #06281a; cursor: pointer;
+  }
+  button.secondary { background: var(--line); color: var(--text); }
+  button:disabled { opacity: .35; cursor: default; }
+  .row { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+  google-cast-launcher { width: 40px; height: 40px; display: inline-block; }
+</style>
+</head>
+<body>
+<h1>QuizStream — Host Dashboard</h1>
+
+<div class="card">
+  <h2>Status</h2>
+  <div class="state" id="state">–</div>
+  <div class="meta" id="meta"></div>
+</div>
+
+<div class="card">
+  <h2>Steuerung</h2>
+  <div class="btns">
+    <button id="btn-start">Quiz starten</button>
+    <button id="btn-next">Nächste Frage</button>
+    <button id="btn-end" class="secondary">Quiz beenden</button>
+    <button id="btn-reset" class="secondary">Zurück zur Lobby</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>TV / Cast</h2>
+  <p class="meta">Stream-URL (HLS): <code id="stream-url">–</code></p>
+  <p class="meta">Mitspiel-Link: <code id="join-url">–</code></p>
+  <p class="meta" style="margin-top:10px">
+    Cast auf den TV: <google-cast-launcher></google-cast-launcher>
+    <span id="cast-hint">— oder Stream-URL in VLC/Google Home öffnen und casten.</span>
+  </p>
+</div>
+
+<div class="card">
+  <h2>Spieler & Punkte (<span id="pcount">0</span>) — Antworten: <span id="acount">0</span></h2>
+  <div id="players"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function () {
+  var socket = io();
+  var st = null;
+
+  socket.emit('host_join');
+  socket.on('connect', function () { socket.emit('host_join'); });
+
+  socket.on('host_state', function (s) {
+    st = s;
+    document.getElementById('state').textContent = s.state;
+    var meta = '';
+    if (s.state === 'QUESTION' || s.state === 'REVEAL') {
+      meta = 'Frage ' + (s.currentIndex + 1) + ' von ' + s.totalQuestions;
+    } else if (s.state === 'LOBBY') {
+      meta = 'Warte auf Spieler … (Stream-Delay: ' + s.streamDelayMs + ' ms)';
+    }
+    document.getElementById('meta').textContent = meta;
+    document.getElementById('stream-url').textContent = s.streamUrl;
+    document.getElementById('join-url').textContent = s.joinUrl;
+    document.getElementById('pcount').textContent = s.players.length;
+    document.getElementById('acount').textContent = s.answerCount;
+
+    var el = document.getElementById('players');
+    el.innerHTML = '';
+    s.players.forEach(function (p, i) {
+      var row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = '<span>' + (i + 1) + '. ' + esc(p.name) + '</span><span>' + p.score + '</span>';
+      el.appendChild(row);
+    });
+
+    document.getElementById('btn-start').disabled = s.state !== 'LOBBY';
+    document.getElementById('btn-next').disabled = s.state !== 'REVEAL';
+    document.getElementById('btn-end').disabled = s.state === 'FINISHED' || s.state === 'LOBBY';
+    document.getElementById('btn-reset').disabled = s.state === 'LOBBY';
+  });
+
+  document.getElementById('btn-start').onclick = function () { socket.emit('start_quiz'); };
+  document.getElementById('btn-next').onclick = function () { socket.emit('next_question'); };
+  document.getElementById('btn-end').onclick = function () {
+    if (confirm('Quiz wirklich beenden?')) socket.emit('end_quiz');
+  };
+  document.getElementById('btn-reset').onclick = function () {
+    if (confirm('Zurück zur Lobby? Punkte werden zurückgesetzt.')) socket.emit('reset_quiz');
+  };
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // ---- Google Cast Sender (Default Media Receiver + HLS-URL) ----
+  window['__onGCastApiAvailable'] = function (isAvailable) {
+    if (!isAvailable) return;
+    cast.framework.CastContext.getInstance().setOptions({
+      receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+      autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+    });
+    cast.framework.CastContext.getInstance().addEventListener(
+      cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+      function (e) {
+        if (e.sessionState === cast.framework.SessionState.SESSION_STARTED && st) {
+          var mediaInfo = new chrome.cast.media.MediaInfo(st.streamUrl, 'application/x-mpegurl');
+          mediaInfo.streamType = chrome.cast.media.StreamType.LIVE;
+          var request = new chrome.cast.media.LoadRequest(mediaInfo);
+          cast.framework.CastContext.getInstance().getCurrentSession()
+            .loadMedia(request)
+            .then(function () { document.getElementById('cast-hint').textContent = '— Stream läuft auf dem TV.'; })
+            .catch(function (err) { document.getElementById('cast-hint').textContent = '— Cast-Fehler: ' + err; });
+        }
+      }
+    );
+  };
+  var s = document.createElement('script');
+  s.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

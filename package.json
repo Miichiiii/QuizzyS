@@ -10,6 +10,7 @@
   "dependencies": {
     "express": "^4.19.2",
     "qrcode": "^1.5.4",
+    "skia-canvas": "^3.0.8",
     "socket.io": "^4.7.5"
   },
   "devDependencies": {

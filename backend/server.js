@@ -25,6 +25,11 @@ app.use("/receiver", express.static(path.join(FRONTEND, "receiver")));
 app.use("/player", express.static(path.join(FRONTEND, "player")));
 app.use("/editor", express.static(path.join(FRONTEND, "editor")));
 app.use("/sounds", express.static(path.join(__dirname, "sounds")));
+app.use('/hls', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-cache');
+  next();
+}, express.static(path.join(FRONTEND, 'hls')));
 app.use("/", express.static(path.join(FRONTEND, "landing")));
 
 const { loadQuestions, saveQuestions } = require("./game/questions");

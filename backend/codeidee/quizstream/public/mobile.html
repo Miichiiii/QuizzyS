@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>QuizStream — Mitspielen</title>
+<style>
+  :root {
+    --bg: #101828; --panel: #1b2436; --line: #2a3550;
+    --text: #eef2f8; --dim: #8ea0bd; --accent: #35d07f; --wrong: #e5534b;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    padding: 20px; max-width: 480px; margin: 0 auto;
+  }
+  h1 { font-size: 1.1rem; letter-spacing: .12em; color: var(--dim); text-transform: uppercase; margin-bottom: 24px; }
+  .screen { display: none; flex: 1; flex-direction: column; }
+  .screen.active { display: flex; }
+  input {
+    width: 100%; padding: 14px; font-size: 1.1rem; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+    margin-bottom: 12px;
+  }
+  button {
+    width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700;
+    border: none; border-radius: 10px; background: var(--accent); color: #06281a;
+    cursor: pointer;
+  }
+  button:disabled { opacity: .45; }
+  .question { font-size: 1.3rem; font-weight: 700; margin: 8px 0 18px; line-height: 1.35; }
+  .timerbar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
+  .timerbar > div { height: 100%; background: var(--accent); width: 100%; transition: width 1s linear; }
+  .opt {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    margin-bottom: 10px; text-align: left; display: flex; gap: 12px; align-items: center;
+  }
+  .opt .letter { color: var(--accent); font-weight: 800; }
+  .opt.selected { border-color: var(--accent); }
+  .opt.correct { background: var(--accent); color: #06281a; }
+  .opt.correct .letter { color: #06281a; }
+  .opt.wrongpick { background: var(--wrong); color: #fff; }
+  .opt.wrongpick .letter { color: #fff; }
+  .status { color: var(--dim); text-align: center; margin-top: 10px; min-height: 1.4em; }
+  .big { font-size: 2.2rem; font-weight: 800; text-align: center; margin: 30px 0 10px; }
+  .board { margin-top: 20px; }
+  .board .row { display: flex; justify-content: space-between; padding: 10px 4px; border-bottom: 1px solid var(--line); }
+  .board .row.me { color: var(--accent); font-weight: 700; }
+  .err { color: var(--wrong); min-height: 1.3em; margin-top: 6px; }
+</style>
+</head>
+<body>
+<h1>QuizStream</h1>
+
+<div class="screen active" id="s-join">
+  <p style="color:var(--dim); margin-bottom:16px">Schau auf den Fernseher — beantworte hier.</p>
+  <input id="name" placeholder="Dein Name" maxlength="20" autocomplete="off">
+  <button id="btn-join">Mitspielen</button>
+  <div class="err" id="join-err"></div>
+</div>
+
+<div class="screen" id="s-wait">
+  <div class="big">Du bist drin!</div>
+  <p class="status">Warte, bis der Host das Quiz startet …</p>
+</div>
+
+<div class="screen" id="s-question">
+  <div class="timerbar"><div id="bar"></div></div>
+  <div class="question" id="q-text"></div>
+  <div id="opts"></div>
+  <p class="status" id="q-status"></p>
+</div>
+
+<div class="screen" id="s-result">
+  <div class="big" id="r-head"></div>
+  <p class="status" id="r-sub"></p>
+  <div class="board" id="board"></div>
+  <p class="status">Nächste Frage kommt auf dem TV …</p>
+</div>
+
+<div class="screen" id="s-final">
+  <div class="big">Endstand</div>
+  <div class="board" id="final-board"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function () {
+  var socket = io();
+  var myName = '';
+  var current = null;       // aktuelle Frage
+  var picked = -1;
+  var barTimer = null;
+
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+  }
+
+  document.getElementById('btn-join').onclick = function () {
+    var name = document.getElementById('name').value.trim();
+    socket.emit('player_join', { name: name }, function (res) {
+      if (!res.ok) { document.getElementById('join-err').textContent = res.error; return; }
+      myName = res.name;
+      show('s-wait');
+    });
+  };
+
+  socket.on('question_start', function (q) {
+    current = q;
+    picked = -1;
+    document.getElementById('q-text').textContent =
+      'Frage ' + (q.index + 1) + '/' + q.total + ': ' + q.text;
+    document.getElementById('q-status').textContent = '';
+
+    var opts = document.getElementById('opts');
+    opts.innerHTML = '';
+    var letters = ['A', 'B', 'C', 'D'];
+    q.options.forEach(function (opt, i) {
+      var b = document.createElement('button');
+      b.className = 'opt';
+      b.dataset.i = i;
+      b.innerHTML = '<span class="letter">' + letters[i] + '</span><span>' + esc(opt) + '</span>';
+      b.onclick = function () { answer(i); };
+      opts.appendChild(b);
+    });
+
+    // Countdown-Balken, synchron zur Server-Endzeit
+    var total = q.endsAt - q.serverNow;
+    var bar = document.getElementById('bar');
+    bar.style.transition = 'none'; bar.style.width = '100%';
+    clearInterval(barTimer);
+    var start = Date.now();
+    barTimer = setInterval(function () {
+      var left = Math.max(0, total - (Date.now() - start));
+      bar.style.transition = 'width .25s linear';
+      bar.style.width = (100 * left / total) + '%';
+      if (left <= 0) clearInterval(barTimer);
+    }, 250);
+
+    show('s-question');
+  });
+
+  function answer(i) {
+    if (picked >= 0 || !current) return;
+    socket.emit('answer', { questionId: current.questionId, selectedOption: i }, function (res) {
+      if (!res.ok) { document.getElementById('q-status').textContent = res.error; return; }
+      picked = i;
+      document.querySelectorAll('.opt').forEach(function (b) {
+        b.disabled = true;
+        if (Number(b.dataset.i) === i) b.classList.add('selected');
+      });
+      document.getElementById('q-status').textContent = 'Antwort gesendet ✓';
+    });
+  }
+
+  socket.on('answer_result', function (r) {
+    // Aufloesung direkt in den Buttons markieren
+    document.querySelectorAll('.opt').forEach(function (b) {
+      var i = Number(b.dataset.i);
+      b.disabled = true;
+      if (i === r.correctIndex) b.classList.add('correct');
+      else if (i === picked) b.classList.add('wrongpick');
+    });
+    var head = document.getElementById('r-head');
+    var sub = document.getElementById('r-sub');
+    if (picked < 0) { head.textContent = 'Zu langsam!'; sub.textContent = 'Keine Antwort abgegeben.'; }
+    else if (r.correct) { head.textContent = 'Richtig! +' + r.gained; sub.textContent = 'Schnelligkeit zahlt sich aus.'; }
+    else { head.textContent = 'Leider falsch'; sub.textContent = 'Die Auflösung siehst du auf dem TV.'; }
+    setTimeout(function () { show('s-result'); }, 1200);
+  });
+
+  socket.on('scoreboard', function (ranking) {
+    renderBoard('board', ranking);
+  });
+
+  socket.on('quiz_finished', function (data) {
+    renderBoard('final-board', data.ranking);
+    show('s-final');
+  });
+
+  socket.on('back_to_lobby', function () { show('s-wait'); });
+
+  function renderBoard(elId, ranking) {
+    var el = document.getElementById(elId);
+    el.innerHTML = '';
+    ranking.forEach(function (p, i) {
+      var row = document.createElement('div');
+      row.className = 'row' + (p.name === myName ? ' me' : '');
+      row.innerHTML = '<span>' + (i + 1) + '. ' + esc(p.name) + '</span><span>' + p.score + '</span>';
+      el.appendChild(row);
+    });
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+})();
+</script>
+</body>
+</html>
