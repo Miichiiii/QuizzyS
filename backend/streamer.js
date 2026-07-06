@@ -180,19 +180,19 @@ class Streamer {
     ctx.font = 'bold 24px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(\`QUIZZY • RAUM \${this.roomCode}\`, 70, 60);
+    ctx.fillText(`QUIZZY • RAUM ${this.roomCode}`, 70, 60);
 
     ctx.textAlign = 'right';
     if (this.state.view === 'QUESTION' || this.state.view === 'REVEAL') {
-      ctx.fillText(\`Antworten: \${this.state.answerCount} / \${this.state.totalPlayers}\`, width - 70, 60);
+      ctx.fillText(`Antworten: ${this.state.answerCount} / ${this.state.totalPlayers}`, width - 70, 60);
     } else if (this.state.view === 'LOBBY') {
-      ctx.fillText(\`Spieler: \${this.state.playerCount}\`, width - 70, 60);
+      ctx.fillText(`Spieler: ${this.state.playerCount}`, width - 70, 60);
     }
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#f0c674';
     if (this.state.view === 'QUESTION') {
-      ctx.fillText(\`Verbleibende Zeit: \${this.state.secondsLeft}s\`, width/2, 60);
+      ctx.fillText(`Verbleibende Zeit: ${this.state.secondsLeft}s`, width/2, 60);
     } else if (this.state.view === 'REVEAL') {
       ctx.fillText("AUFLÖSUNG", width/2, 60);
     } else if (this.state.view === 'FINISHED') {
@@ -219,11 +219,11 @@ class Streamer {
     
     ctx.fillStyle = '#a0aabf';
     ctx.font = '30px sans-serif';
-    ctx.fillText(\`Auf dem Handy öffnen: \${this.state.joinUrl}\`, width/2, height/2 + 30);
+    ctx.fillText(`Auf dem Handy öffnen: ${this.state.joinUrl}`, width/2, height/2 + 30);
     
     ctx.fillStyle = '#35d07f';
     ctx.font = 'bold 36px sans-serif';
-    ctx.fillText(\`Warte auf den Host...\`, width/2, height/2 + 120);
+    ctx.fillText(`Warte auf den Host...`, width/2, height/2 + 120);
   }
 
   drawCategory(ctx, width, height) {
@@ -234,7 +234,7 @@ class Streamer {
     
     ctx.fillStyle = '#35d07f';
     ctx.font = '36px sans-serif';
-    ctx.fillText(\`\${this.state.chooserName} wählt gerade aus...\`, width/2, height/2 + 40);
+    ctx.fillText(`${this.state.chooserName} wählt gerade aus...`, width/2, height/2 + 40);
   }
 
   drawQuestion(ctx, width, height) {
@@ -325,7 +325,7 @@ class Streamer {
         ctx.fillStyle = '#ffffff';
         ctx.font = '36px sans-serif';
       }
-      ctx.fillText(\`\${i + 1}. \${r.name} - \${r.score} Punkte\`, width/2, y);
+      ctx.fillText(`${i + 1}. ${r.name} - ${r.score} Punkte`, width/2, y);
       y += 60;
     }
   }
