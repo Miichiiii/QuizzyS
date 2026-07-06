@@ -91,6 +91,7 @@
   @media (prefers-reduced-motion: reduce) { .blink { animation: none; } }
 </style>
 </head>
+
 <body>
   <div style="width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <div class="brand" style="margin: 0;">Quiz<b>C</b><i>a</i>st</div>
@@ -231,7 +232,8 @@ let CAST_APP_ID = "";
 
 // Config vom Server laden (einmalig beim Start).
 fetch("/api/config").then(r => r.json()).then(cfg => {
-  CAST_APP_ID = cfg.castAppId || "";
+  // Fallback auf die vom Nutzer bereitgestellte App-ID
+  CAST_APP_ID = cfg.castAppId || "83F03943"; 
   
   // Cast SDK Script erst laden, wenn die CAST_APP_ID vorliegt, um Race Condition zu vermeiden
   const script = document.createElement("script");

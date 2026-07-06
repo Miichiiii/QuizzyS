@@ -18,10 +18,29 @@ const io = new Server(server, { cors: { origin: "*" } }); // Receiver laeuft auf
 
 // Statisches Frontend direkt ausliefern
 const FRONTEND = path.join(__dirname, "..", "frontend");
+app.use(express.json()); // Fuer POST-Requests
+
 app.use("/host", express.static(path.join(FRONTEND, "host")));
 app.use("/receiver", express.static(path.join(FRONTEND, "receiver")));
 app.use("/player", express.static(path.join(FRONTEND, "player")));
+app.use("/editor", express.static(path.join(FRONTEND, "editor")));
 app.use("/sounds", express.static(path.join(__dirname, "sounds")));
+app.use("/", express.static(path.join(FRONTEND, "landing")));
+
+const { loadQuestions, saveQuestions } = require("./game/questions");
+
+app.get("/api/questions", (req, res) => {
+  res.json(loadQuestions());
+});
+
+app.post("/api/questions", (req, res) => {
+  if (Array.isArray(req.body)) {
+    saveQuestions(req.body);
+    res.json({ ok: true });
+  } else {
+    res.status(400).json({ ok: false, error: "Ungültiges Format" });
+  }
+});
 
 app.get("/api/sounds", (req, res) => {
   try {
@@ -34,7 +53,6 @@ app.get("/api/sounds", (req, res) => {
   }
 });
 
-app.get("/", (req, res) => res.redirect("/host/"));
 app.get("/health", (req, res) => res.send("ok"));
 
 // v2: QR-Code-Endpunkt – generiert SVG serverseitig, kein externer API-Dienst.
