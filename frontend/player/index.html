@@ -11,6 +11,8 @@
     --bg: #0f0f23; --panel: #1a1a35; --line: #3a3a6a;
     --white: #fcfcfc; --dim: #7c7ca8;
     --blue: #3cbcfc; --red: #f83800; --gold: #f8b800; --good: #00a800;
+    --gruen: #00a800; --gelb: #f8b800; --orange: #f87800; --pink: #f878f8;
+    --violett: #a800a8; --cyan: #00e8e8; --braun: #a85400; --weiss: #fcfcfc;
     --my: var(--dim); --mybg: var(--bg);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -26,6 +28,21 @@
   }
   body.blau { background: #081428; --my: var(--blue); --mybg: #0a2038; }
   body.rot  { background: #1c0500; --my: var(--red);  --mybg: #300800; }
+  body.gruen { background: #001800; --my: var(--gruen); --mybg: #002800; }
+  body.gelb  { background: #181000; --my: var(--gelb);  --mybg: #382800; }
+  body.orange { background: #180800; --my: var(--orange); --mybg: #381800; }
+  body.pink  { background: #180018; --my: var(--pink);  --mybg: #380838; }
+  body.violett { background: #100010; --my: var(--violett); --mybg: #200020; }
+  body.cyan  { background: #001818; --my: var(--cyan);  --mybg: #003030; }
+  body.braun { background: #100800; --my: var(--braun); --mybg: #281400; }
+  body.weiss { background: #181818; --my: var(--weiss); --mybg: #303030; }
+  .instructions {
+    background: var(--panel); border: 4px solid var(--line);
+    padding: 14px; margin-top: 20px; font-size: 7px; color: var(--dim);
+    line-height: 1.8; text-align: left; width: 100%;
+  }
+  .instructions h3 { color: var(--gold); font-size: 8px; margin-bottom: 8px; text-transform: uppercase; text-align: center; }
+
   .screen { display: none; flex: 1; flex-direction: column; }
   .screen.active { display: flex; }
   .top { font-size: 8px; color: var(--my); min-height: 14px; text-transform: uppercase; }
@@ -77,7 +94,16 @@
     <input id="code" placeholder="SPIEL-CODE" maxlength="6" autocomplete="off">
     <button id="joinBtn">Beitreten</button>
     <div class="err" id="joinErr"></div>
+    <div class="instructions">
+      <h3>★ SPIELREGELN ★</h3>
+      - Trage deinen Namen und den 6-stelligen Spielcode ein.<br>
+      - Sobald das Spiel startet, wählt der blaue Spieler (P1) die Kategorie.<br>
+      - Beantworte die Fragen direkt auf deinem Smartphone.<br>
+      - Richtige Antwort = 100 Punkte.<br>
+      - Wer als Erstes richtig antwortet, erhält +50 Punkte Speed-Bonus!
+    </div>
   </div>
+
 
   <!-- Warten -->
   <div class="screen" id="s-wait">
@@ -138,12 +164,19 @@ function show(id) {
   $(id).classList.add("active");
 }
 
+const colorsText = {
+  blau: "Blau", rot: "Rot", gruen: "Grün", gelb: "Gelb", orange: "Orange",
+  pink: "Pink", violett: "Violett", cyan: "Cyan", braun: "Braun", weiss: "Weiß"
+};
+
 function applyColor(color) {
   myColor = color;
   document.body.className = myColor;
-  $("waitTag").textContent = "Team " + myColor;
-  $("catTag").textContent = "Team " + myColor;
+  const colName = colorsText[myColor] || myColor.toUpperCase();
+  $("waitTag").textContent = "Team " + colName;
+  $("catTag").textContent = "Team " + colName;
 }
+
 
 // v2: Reconnect – Code + Farbe im sessionStorage merken.
 function saveSession(code, color, name) {

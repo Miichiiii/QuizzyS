@@ -42,11 +42,13 @@ const timeout = setTimeout(() => {
   const host = await connect();
   const p1 = await connect();
   const p2 = await connect();
+  const p3 = await connect();
+  const p4 = await connect();
   const tv = await connect();
 
   // Sicherheits-Assertion: correctIndex darf NIE vor reveal_answer rausgehen
   let leakDetected = false;
-  [p1, p2, tv].forEach(s => s.on("next_question", d => {
+  [p1, p2, p3, p4, tv].forEach(s => s.on("next_question", d => {
     if ("correctIndex" in d) leakDetected = true;
   }));
 
@@ -55,24 +57,32 @@ const timeout = setTimeout(() => {
   assert(created.ok && /^[A-Z0-9]{6}$/.test(created.code), "create_game liefert 6-stelligen Code: " + created.code);
   const code = created.code;
 
-  // 2) 2x join_game + Spectator
+  // Spielerlimit auf 4 ändern
+  const limitRes = await emit(host, "change_player_limit", { code, limit: 4 });
+  assert(limitRes.ok && limitRes.maxPlayers === 4, "Host ändert Spielerlimit auf 4");
+
+  // 2) 4x join_game + Spectator
   const j1 = await emit(p1, "join_game", { code, name: "Micha" });
   assert(j1.ok && j1.color === "blau", "Spieler 1 joint als BLAU");
   const j2 = await emit(p2, "join_game", { code, name: "Gegner" });
   assert(j2.ok && j2.color === "rot", "Spieler 2 joint als ROT");
+  const j3 = await emit(p3, "join_game", { code, name: "Dritt" });
+  assert(j3.ok && j3.color === "gruen", "Spieler 3 joint als GRUEN");
+  const j4 = await emit(p4, "join_game", { code, name: "Viert" });
+  assert(j4.ok && j4.color === "gelb", "Spieler 4 joint als GELB");
 
-  const j3 = await emit(tv, "join_as_spectator", { code });
-  assert(j3.ok, "TV joint als Spectator");
+  const jSpec = await emit(tv, "join_as_spectator", { code });
+  assert(jSpec.ok, "TV joint als Spectator");
 
-  // 3. Spieler muss abgelehnt werden
-  const p3 = await connect();
-  const j4 = await emit(p3, "join_game", { code, name: "Eindringling" });
-  assert(!j4.ok, "3. Spieler wird abgelehnt (max 2)");
+  // 5. Spieler muss abgelehnt werden (Limit = 4)
+  const p5 = await connect();
+  const j5 = await emit(p5, "join_game", { code, name: "Eindringling" });
+  assert(!j5.ok, "5. Spieler wird abgelehnt (max 4)");
 
   // Falscher Code (vor dem Disconnect testen, sonst kommt kein Callback mehr)
-  const jBad = await emit(p3, "join_game", { code: "XXXXXX", name: "Geist" });
+  const jBad = await emit(p5, "join_game", { code: "XXXXXX", name: "Geist" });
   assert(!jBad.ok, "Join mit falschem Code wird abgelehnt");
-  p3.disconnect();
+  p5.disconnect();
 
   // 3) start_game -> game_starting + category_select
   const gotStarting = new Promise(res => tv.once("game_starting", res));
@@ -92,9 +102,9 @@ const timeout = setTimeout(() => {
   const wrongChooser = await emit(p2, "select_category", { code, category: catData.categories[0] });
   assert(!wrongChooser.ok, "Roter Spieler darf Kategorie nicht wählen");
 
-  // 4) Fragen-Loop: p1 antwortet immer Index 0, p2 immer Index 1.
+  // 4) Fragen-Loop: p1, p3 antworten 0, p2, p4 antworten 1.
   let questionCount = 0, revealCount = 0, tickSeen = false, lockSeen = false;
-  let expectedBlau = 0, expectedRot = 0;
+  let expectedBlau = 0, expectedRot = 0, expectedGruen = 0, expectedGelb = 0;
 
   tv.on("timer_tick", () => tickSeen = true);
   tv.on("lock_answer", () => lockSeen = true);
@@ -106,14 +116,19 @@ const timeout = setTimeout(() => {
     const dup = await emit(p1, "submit_answer", { code, answerIndex: 2 });
     if (dup.ok) { failed++; console.error("  ❌ Doppelte Antwort wurde akzeptiert!"); }
     await emit(p2, "submit_answer", { code, answerIndex: 1 });
+    await emit(p3, "submit_answer", { code, answerIndex: 0 });
+    await emit(p4, "submit_answer", { code, answerIndex: 1 });
   });
 
   tv.on("reveal_answer", d => {
     revealCount++;
-    // Erwartete Scores serverunabhaengig mitrechnen (unser eigenes Orakel):
-    // p1 antwortet 0, p2 antwortet 1. p1 ist schneller.
-    if (d.correctIndex === 0) expectedBlau += 150;      // richtig + schnellster
-    else if (d.correctIndex === 1) expectedRot += 150;  // einziger Richtige = auch schnellster
+    if (d.correctIndex === 0) {
+      expectedBlau += 150;  // richtig + schnellster
+      expectedGruen += 100; // richtig
+    } else if (d.correctIndex === 1) {
+      expectedRot += 150;   // richtig + schnellster
+      expectedGelb += 100;  // richtig
+    }
     assert(typeof d.correctIndex === "number", `reveal_answer #${revealCount} enthält correctIndex`);
   });
 
@@ -132,10 +147,23 @@ const timeout = setTimeout(() => {
 
   const blau = finished.players.find(p => p.color === "blau");
   const rot = finished.players.find(p => p.color === "rot");
+  const gruen = finished.players.find(p => p.color === "gruen");
+  const gelb = finished.players.find(p => p.color === "gelb");
   assert(blau.score === expectedBlau, `Scoreboard Blau korrekt: ${blau.score} (erwartet ${expectedBlau})`);
   assert(rot.score === expectedRot, `Scoreboard Rot korrekt: ${rot.score} (erwartet ${expectedRot})`);
-  const expectedWinner = expectedBlau === expectedRot ? null : (expectedBlau > expectedRot ? "blau" : "rot");
+  assert(gruen.score === expectedGruen, `Scoreboard Grün korrekt: ${gruen.score} (erwartet ${expectedGruen})`);
+  assert(gelb.score === expectedGelb, `Scoreboard Gelb korrekt: ${gelb.score} (erwartet ${expectedGelb})`);
+
+  let maxScore = Math.max(expectedBlau, expectedRot, expectedGruen, expectedGelb);
+  let expectedWinners = [];
+  if (expectedBlau === maxScore) expectedWinners.push("blau");
+  if (expectedRot === maxScore) expectedWinners.push("rot");
+  if (expectedGruen === maxScore) expectedWinners.push("gruen");
+  if (expectedGelb === maxScore) expectedWinners.push("gelb");
+  const expectedWinner = expectedWinners.length === 1 ? expectedWinners[0] : null;
+
   assert(finished.winner === expectedWinner, `Gewinner korrekt: ${finished.winner === null ? "Unentschieden" : finished.winner}`);
+
 
   // ─────────────────────────────────────────────────────
   // 6) v2 Reconnect-Test: Neues Spiel, Spieler trennt mitten in der 1. Frage die Verbindung.

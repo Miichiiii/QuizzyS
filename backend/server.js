@@ -1,6 +1,7 @@
 // QuizCast Server: Express liefert statisches Frontend, Socket.io macht Spiellogik.
 // Kein Build-Step, keine DB, ein Prozess. Laeuft auf jedem billigen VPS / Free-Tier.
 
+const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const express = require("express");
@@ -20,6 +21,19 @@ const FRONTEND = path.join(__dirname, "..", "frontend");
 app.use("/host", express.static(path.join(FRONTEND, "host")));
 app.use("/receiver", express.static(path.join(FRONTEND, "receiver")));
 app.use("/player", express.static(path.join(FRONTEND, "player")));
+app.use("/sounds", express.static(path.join(__dirname, "sounds")));
+
+app.get("/api/sounds", (req, res) => {
+  try {
+    const soundsDir = path.join(__dirname, "sounds");
+    const files = fs.readdirSync(soundsDir)
+      .filter(file => file.endsWith(".mp3") || file.endsWith(".wav"));
+    res.json(files);
+  } catch (e) {
+    res.status(500).json([]);
+  }
+});
+
 app.get("/", (req, res) => res.redirect("/host/"));
 app.get("/health", (req, res) => res.send("ok"));
 
@@ -142,12 +156,38 @@ io.on("connection", (socket) => {
     if (cb) cb(result);
   });
 
+  // Host ändert Spielerlimit in der Lobby.
+  socket.on("change_player_limit", (payload, cb) => {
+    const room = rooms.get((payload?.code || "").toUpperCase());
+    if (!room) return cb && cb({ ok: false, error: "Raum nicht gefunden." });
+    const result = room.changePlayerLimit(socket.id, payload?.limit);
+    if (cb) cb(result);
+  });
+
   // Spieler antwortet - Server validiert alles
   socket.on("submit_answer", (payload, cb) => {
     const room = rooms.get((payload?.code || "").toUpperCase());
     if (!room) return cb && cb({ ok: false, error: "Raum nicht gefunden." });
     const result = room.submitAnswer(socket.id, payload?.answerIndex);
     if (cb) cb(result);
+  });
+
+  // Host ändert Lautstärke.
+  socket.on("change_volume", (payload, cb) => {
+    const room = rooms.get((payload?.code || "").toUpperCase());
+    if (!room) return cb && cb({ ok: false, error: "Raum nicht gefunden." });
+    room.musicVolume = payload.volume;
+    room.broadcast("volume_changed", { volume: payload.volume });
+    if (cb) cb({ ok: true });
+  });
+
+  // Host ändert Geschwindigkeit.
+  socket.on("change_speed", (payload, cb) => {
+    const room = rooms.get((payload?.code || "").toUpperCase());
+    if (!room) return cb && cb({ ok: false, error: "Raum nicht gefunden." });
+    room.musicSpeed = payload.speed;
+    room.broadcast("speed_changed", { speed: payload.speed });
+    if (cb) cb({ ok: true });
   });
 
   socket.on("disconnect", () => {

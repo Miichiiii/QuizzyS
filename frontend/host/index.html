@@ -11,6 +11,8 @@
     --bg: #0f0f23; --panel: #1a1a35; --line: #3a3a6a;
     --white: #fcfcfc; --dim: #7c7ca8;
     --blue: #3cbcfc; --red: #f83800; --gold: #f8b800; --good: #00a800;
+    --gruen: #00a800; --gelb: #f8b800; --orange: #f87800; --pink: #f878f8;
+    --violett: #a800a8; --cyan: #00e8e8; --braun: #a85400; --weiss: #fcfcfc;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -35,23 +37,37 @@
   }
   .hint { color: var(--dim); font-size: 8px; text-align: center; }
   .hint code { color: var(--white); font-family: inherit; }
-  .players { display: flex; gap: 16px; margin: 36px 0; width: 100%; max-width: 480px; }
+  .players { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin: 24px 0; width: 100%; max-width: 720px; }
   .slot {
-    flex: 1; border: 4px dashed var(--line);
-    padding: 18px 10px; text-align: center; color: var(--dim);
-    font-size: 9px; transition: none;
+    border: 4px dashed var(--line);
+    padding: 14px 8px; text-align: center; color: var(--dim);
+    font-size: 8px; transition: none;
   }
   .slot.filled.blau { border: 4px solid var(--blue); color: var(--blue); background: #0a2038; box-shadow: 4px 4px 0 #0a2038; }
   .slot.filled.rot  { border: 4px solid var(--red);  color: var(--red);  background: #300800; box-shadow: 4px 4px 0 #300800; }
-  .slot .tag { display: block; font-size: 7px; margin-bottom: 8px; opacity: .8; }
+  .slot.filled.gruen { border: 4px solid var(--gruen); color: var(--gruen); background: #002800; box-shadow: 4px 4px 0 #002800; }
+  .slot.filled.gelb { border: 4px solid var(--gelb); color: var(--gelb); background: #382800; box-shadow: 4px 4px 0 #382800; }
+  .slot.filled.orange { border: 4px solid var(--orange); color: var(--orange); background: #381800; box-shadow: 4px 4px 0 #381800; }
+  .slot.filled.pink { border: 4px solid var(--pink); color: var(--pink); background: #380838; box-shadow: 4px 4px 0 #380838; }
+  .slot.filled.violett { border: 4px solid var(--violett); color: var(--violett); background: #200020; box-shadow: 4px 4px 0 #200020; }
+  .slot.filled.cyan { border: 4px solid var(--cyan); color: var(--cyan); background: #003030; box-shadow: 4px 4px 0 #003030; }
+  .slot.filled.braun { border: 4px solid var(--braun); color: var(--braun); background: #281400; box-shadow: 4px 4px 0 #281400; }
+  .slot.filled.weiss { border: 4px solid var(--weiss); color: var(--weiss); background: #303030; box-shadow: 4px 4px 0 #303030; }
+  .slot .tag { display: block; font-size: 6px; margin-bottom: 6px; opacity: .8; }
   .kick-btn {
-    font: inherit; font-size: 8px; border: 2px solid currentColor;
-    padding: 4px 8px; cursor: pointer; background: transparent;
+    font: inherit; font-size: 7px; border: 2px solid currentColor;
+    padding: 3px 6px; cursor: pointer; background: transparent;
     color: inherit; box-shadow: none; width: auto; max-width: none;
-    margin-top: 10px; display: none;
+    margin-top: 8px; display: none;
   }
   .slot.filled .kick-btn { display: inline-block; }
   .kick-btn:active { transform: translate(1px,1px); }
+  .instructions {
+    background: var(--panel); border: 4px solid var(--line);
+    padding: 16px; margin-top: 24px; max-width: 480px; width: 100%;
+    font-size: 8px; color: var(--dim); line-height: 1.8;
+  }
+  .instructions h3 { color: var(--gold); font-size: 9px; margin-bottom: 10px; text-transform: uppercase; text-align: center; }
   button {
     font: inherit; font-size: 11px; border: 4px solid var(--white);
     padding: 16px 20px; cursor: pointer; width: 100%; max-width: 480px;
@@ -83,15 +99,58 @@
   <div class="hint">Spieler: <code id="playerUrl">/player</code><br>Code eingeben <span class="blink">▮</span></div>
   <div id="qrWrap"><img id="qrImg" alt="QR-Code zum Beitreten"></div>
 
-  <div class="players">
-    <div class="slot" id="slot0"><span class="tag">P1 · BLAU</span><span class="name">wartet…</span><button class="kick-btn" data-color="blau">[X] Kick</button></div>
-    <div class="slot" id="slot1"><span class="tag">P2 · ROT</span><span class="name">wartet…</span><button class="kick-btn" data-color="rot">[X] Kick</button></div>
+  <!-- Spielerlimit-Selector -->
+  <div id="limitControl" style="margin: 24px 0 12px; font-size: 8px; display: flex; align-items: center; gap: 14px; background: var(--panel); padding: 10px 16px; border: 4px solid var(--line); box-shadow: 4px 4px 0 #000; width: 100%; max-width: 480px; justify-content: space-between;">
+    <span style="color: var(--dim);">MAX SPIELER (2-10):</span>
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <button id="decLimit" style="width: auto; padding: 4px 10px; font-size: 8px; box-shadow: none; border-width: 2px; margin: 0; background: var(--panel); border-color: var(--white); cursor: pointer;">-</button>
+      <span id="limitVal" style="color: var(--gold); font-size: 11px;">2</span>
+      <button id="incLimit" style="width: auto; padding: 4px 10px; font-size: 8px; box-shadow: none; border-width: 2px; margin: 0; background: var(--panel); border-color: var(--white); cursor: pointer;">+</button>
+    </div>
   </div>
+
+  <!-- Sound-Optionen -->
+  <div id="audioControl" style="margin: 12px 0 24px; font-size: 8px; background: var(--panel); padding: 16px; border: 4px solid var(--line); box-shadow: 4px 4px 0 #000; width: 100%; max-width: 480px;">
+    <h3 style="color: var(--gold); font-size: 9px; margin-bottom: 14px; text-transform: uppercase; text-align: center;">★ Sound-Optionen (TV) ★</h3>
+    
+    <!-- Volume Control -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+      <span style="color: var(--dim);">LAUTSTÄRKE:</span>
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <button id="decVol" style="width: auto; padding: 4px 10px; font-size: 8px; box-shadow: none; border-width: 2px; margin: 0; background: var(--panel); border-color: var(--white); cursor: pointer;">-</button>
+        <span id="volVal" style="color: var(--white); font-size: 11px; width: 45px; text-align: center;">50%</span>
+        <button id="incVol" style="width: auto; padding: 4px 10px; font-size: 8px; box-shadow: none; border-width: 2px; margin: 0; background: var(--panel); border-color: var(--white); cursor: pointer;">+</button>
+      </div>
+    </div>
+    
+    <!-- Speed Control -->
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <span style="color: var(--dim);">GESCHWINDIGKEIT:</span>
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <button id="decSpeed" style="width: auto; padding: 4px 10px; font-size: 8px; box-shadow: none; border-width: 2px; margin: 0; background: var(--panel); border-color: var(--white); cursor: pointer;">-</button>
+        <span id="speedVal" style="color: var(--white); font-size: 11px; width: 45px; text-align: center;">1.0x</span>
+        <button id="incSpeed" style="width: auto; padding: 4px 10px; font-size: 8px; box-shadow: none; border-width: 2px; margin: 0; background: var(--panel); border-color: var(--white); cursor: pointer;">+</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="players" id="playerSlots"></div>
 
   <button id="castBtn">▶ Auf TV casten</button>
   <button id="startBtn" disabled>Spiel starten</button>
   <div id="status"></div>
+  
+  <div class="instructions">
+    <h3>★ Retro Spiel-Erklärung ★</h3>
+    1. Wähle mit den +/- Tasten die gewünschte Spieleranzahl (2-10).<br>
+    2. Jeder Spieler scannt den QR-Code oder nutzt den Link zum Beitreten.<br>
+    3. Sobald alle Slots voll besetzt sind, kann das Spiel gestartet werden.<br>
+    4. Die Fragen erscheinen auf dem TV (Receiver). Auf dem Smartphone wird geantwortet.<br>
+    5. Wer richtig antwortet, kriegt 100 Pkt. Der Schnellste erhält +50 Pkt Speed-Bonus!
+  </div>
+
   <div class="live" id="live"></div>
+
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -127,40 +186,129 @@ socket.on("connect", () => {
   });
 });
 
-socket.on("player_joined", ({ players }) => {
-  ["slot0", "slot1"].forEach((id, i) => {
-    const slot = $(id), p = players[i];
+let maxPlayers = 2;
+
+function renderSlots(players) {
+  const container = $("playerSlots");
+  container.innerHTML = "";
+  
+  const colorsText = {
+    blau: "BLAU", rot: "ROT", gruen: "GRÜN", gelb: "GELB", orange: "ORANGE",
+    pink: "PINK", violett: "VIOLETT", cyan: "CYAN", braun: "BRAUN", weiss: "WEISS"
+  };
+  
+  for (let i = 0; i < maxPlayers; i++) {
+    const p = players[i];
+    const slot = document.createElement("div");
+    
     if (p) {
       slot.className = "slot filled " + p.color;
+      slot.innerHTML = `
+        <span class="tag">P${i+1} · ${colorsText[p.color] || p.color.toUpperCase()}</span>
+        <span class="name"></span>
+        <button class="kick-btn" data-color="${p.color}">[X] Kick</button>
+      `;
       slot.querySelector(".name").textContent = p.name;
     } else {
       slot.className = "slot";
-      slot.querySelector(".name").textContent = "wartet…";
+      slot.innerHTML = `
+        <span class="tag">P${i+1} · STANDBY</span>
+        <span class="name">wartet…</span>
+      `;
     }
+    container.appendChild(slot);
+  }
+
+  // Bind kick buttons dynamically
+  container.querySelectorAll('.kick-btn').forEach(btn => {
+    btn.onclick = () => {
+      socket.emit('kick_player', { code: gameCode, color: btn.dataset.color }, res => {
+        if (!res.ok) $('status').textContent = res.error;
+      });
+    };
   });
-  $('startBtn').disabled = players.length !== 2;
+  
+  $('startBtn').disabled = players.length !== maxPlayers;
+  $("limitVal").textContent = maxPlayers;
+}
+
+socket.on("player_joined", ({ players, maxPlayers: limit }) => {
+  if (limit) maxPlayers = limit;
+  renderSlots(players);
 });
 
-// v2: Kick-Buttons
-document.querySelectorAll('.kick-btn').forEach(btn => {
-  btn.onclick = () => {
-    socket.emit('kick_player', { code: gameCode, color: btn.dataset.color }, res => {
-      if (!res.ok) $('status').textContent = res.error;
+$("decLimit").onclick = () => {
+  if (maxPlayers > 2) {
+    socket.emit("change_player_limit", { code: gameCode, limit: maxPlayers - 1 }, res => {
+      if (res.ok) {
+        maxPlayers = res.maxPlayers;
+        $("limitVal").textContent = maxPlayers;
+      } else {
+        $("status").textContent = res.error;
+      }
     });
-  };
-});
+  }
+};
+
+$("incLimit").onclick = () => {
+  if (maxPlayers < 10) {
+    socket.emit("change_player_limit", { code: gameCode, limit: maxPlayers + 1 }, res => {
+      if (res.ok) {
+        maxPlayers = res.maxPlayers;
+        $("limitVal").textContent = maxPlayers;
+      } else {
+        $("status").textContent = res.error;
+      }
+    });
+  }
+};
+
+// ── Sound-Optionen Steuerung ──────────────────────────
+let currentVolume = 0.5;
+let currentSpeed = 1.0;
+
+$("decVol").onclick = () => {
+  currentVolume = Math.max(0, currentVolume - 0.1);
+  updateVolume();
+};
+
+$("incVol").onclick = () => {
+  currentVolume = Math.min(1.0, currentVolume + 0.1);
+  updateVolume();
+};
+
+$("decSpeed").onclick = () => {
+  currentSpeed = Math.max(0.5, currentSpeed - 0.1);
+  updateSpeed();
+};
+
+$("incSpeed").onclick = () => {
+  currentSpeed = Math.min(2.0, currentSpeed + 0.1);
+  updateSpeed();
+};
+
+function updateVolume() {
+  $("volVal").textContent = Math.round(currentVolume * 100) + "%";
+  socket.emit("change_volume", { code: gameCode, volume: currentVolume });
+}
+
+function updateSpeed() {
+  $("speedVal").textContent = currentSpeed.toFixed(1) + "x";
+  socket.emit("change_speed", { code: gameCode, speed: currentSpeed });
+}
 
 $('startBtn').onclick = () => {
   socket.emit('start_game', { code: gameCode }, res => {
     if (!res.ok) $('status').textContent = res.error;
   });
-  // Kick-Buttons nach Start verstecken
-  document.querySelectorAll('.kick-btn').forEach(b => b.style.display = 'none');
 };
 
 socket.on("game_starting", () => {
   $("startBtn").disabled = true;
   $("startBtn").textContent = "Spiel läuft…";
+  $("decLimit").disabled = true;
+  $("incLimit").disabled = true;
+  document.querySelectorAll('.kick-btn').forEach(b => b.style.display = 'none');
 });
 
 // Host bekommt einen schlanken Live-Ticker, keine Spiel-UI (TV zeigt alles).

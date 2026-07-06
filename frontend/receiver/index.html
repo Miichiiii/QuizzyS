@@ -10,6 +10,8 @@
     --bg: #0f0f23; --panel: #1a1a35; --line: #3a3a6a;
     --white: #fcfcfc; --dim: #7c7ca8;
     --blue: #3cbcfc; --red: #f83800; --gold: #f8b800; --good: #00a800;
+    --gruen: #00a800; --gelb: #f8b800; --orange: #f87800; --pink: #f878f8;
+    --violett: #a800a8; --cyan: #00e8e8; --braun: #a85400; --weiss: #fcfcfc;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -37,18 +39,26 @@
   }
   .lobbyHint { font-size: 1.4vw; color: var(--dim); margin-top: 4vh; }
   .lobbyHint span { color: var(--white); }
-  .lobbySlots { display: flex; gap: 3vw; margin-top: 6vh; }
-  .lslot { border: .4vw dashed var(--line); padding: 2.5vh 3vw; font-size: 1.5vw; color: var(--dim); }
+  .lobbySlots { display: flex; flex-wrap: wrap; gap: 1.5vw; margin-top: 4vh; max-width: 80vw; justify-content: center; }
+  .lslot { border: .4vw dashed var(--line); padding: 1.5vh 2.5vw; font-size: 1.2vw; color: var(--dim); min-width: 14vw; text-align: center; }
   .lslot.filled.blau { border: .4vw solid var(--blue); color: var(--blue); background: #0a2038; }
   .lslot.filled.rot  { border: .4vw solid var(--red);  color: var(--red);  background: #300800; }
+  .lslot.filled.gruen { border: .4vw solid var(--gruen); color: var(--gruen); background: #002800; }
+  .lslot.filled.gelb { border: .4vw solid var(--gelb); color: var(--gelb); background: #382800; }
+  .lslot.filled.orange { border: .4vw solid var(--orange); color: var(--orange); background: #381800; }
+  .lslot.filled.pink { border: .4vw solid var(--pink); color: var(--pink); background: #380838; }
+  .lslot.filled.violett { border: .4vw solid var(--violett); color: var(--violett); background: #200020; }
+  .lslot.filled.cyan { border: .4vw solid var(--cyan); color: var(--cyan); background: #003030; }
+  .lslot.filled.braun { border: .4vw solid var(--braun); color: var(--braun); background: #281400; }
+  .lslot.filled.weiss { border: .4vw solid var(--weiss); color: var(--weiss); background: #303030; }
 
   /* Frage: Duell-Layout mit Blau/Rot-Spine */
   #s-question { justify-content: flex-start; padding: 7vh 6vw; align-items: stretch; }
   .spine { display: flex; align-items: center; gap: 1.5vw; margin-bottom: 5vh; }
   .spine .bar { flex: 1; height: 1.4vh; }
   /* Pixel-Streifen statt glatter Balken */
-  .spine .bar.b { background: repeating-linear-gradient(90deg, var(--blue) 0 1vw, #1a5a80 1vw 1.4vw); opacity: .5; }
-  .spine .bar.r { background: repeating-linear-gradient(90deg, var(--red) 0 1vw, #801c00 1vw 1.4vw); opacity: .5; }
+  .spine .bar.b { background: repeating-linear-gradient(90deg, var(--line) 0 1vw, var(--panel) 1vw 1.4vw); opacity: .5; }
+  .spine .bar.r { background: repeating-linear-gradient(90deg, var(--line) 0 1vw, var(--panel) 1vw 1.4vw); opacity: .5; }
   .spine .bar.locked { opacity: 1; }
   #tvTimer {
     font-size: 3vw; min-width: 9vw; text-align: center;
@@ -69,28 +79,55 @@
   .tvAnswers .a.correct { border-color: var(--good); background: #002800; box-shadow: .5vw .5vw 0 #001400; }
   .tvAnswers .a.correct .idx { color: var(--good); }
   .tvAnswers .a.faded { opacity: .3; }
-  .lockinfo { margin-top: 5vh; display: flex; gap: 4vw; font-size: 1.3vw; color: var(--dim); }
-  .lockinfo .blau.locked { color: var(--blue); }
-  .lockinfo .rot.locked { color: var(--red); }
+  
+  .lockinfo { margin-top: 4vh; display: flex; gap: 2.5vw; font-size: 1.1vw; color: var(--dim); flex-wrap: wrap; justify-content: center; }
+  .lockinfo span { padding: 0.5vh 1vw; border: 2px solid transparent; }
+  .lockinfo span.locked { font-weight: bold; border-color: var(--line); background: var(--panel); }
+  .lockinfo span.color-blau.locked { color: var(--blue); }
+  .lockinfo span.color-rot.locked { color: var(--red); }
+  .lockinfo span.color-gruen.locked { color: var(--gruen); }
+  .lockinfo span.color-gelb.locked { color: var(--gelb); }
+  .lockinfo span.color-orange.locked { color: var(--orange); }
+  .lockinfo span.color-pink.locked { color: var(--pink); }
+  .lockinfo span.color-violett.locked { color: var(--violett); }
+  .lockinfo span.color-cyan.locked { color: var(--cyan); }
+  .lockinfo span.color-braun.locked { color: var(--braun); }
+  .lockinfo span.color-weiss.locked { color: var(--weiss); }
 
-  /* Scoreboard: Blau/Rot Split als Arcade-VS-Screen */
-  #s-score { flex-direction: row; align-items: stretch; }
-  .half { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh; }
-  .half.blau { background: #081c38; border-right: .5vw solid var(--bg); }
-  .half.rot  { background: #2c0800; border-left: .5vw solid var(--bg); }
-  .half .pname { font-size: 2.2vw; }
-  .half.blau .pname { color: var(--blue); } .half.rot .pname { color: var(--red); }
-  .half .pscore { font-size: 8vw; text-shadow: .6vw .6vw 0 #000; }
-  .vs {
-    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    background: var(--bg); border: .5vw solid var(--gold);
-    width: 9vw; height: 9vw; display: flex; align-items: center; justify-content: center;
-    font-size: 2.4vw; color: var(--gold); z-index: 3;
-  }
+  /* Leaderboard Scoreboard screen */
+  #s-score { flex-direction: column; align-items: center; justify-content: flex-start; padding: 6vh 5vw; }
+  #s-score h2 { font-size: 2.8vw; color: var(--gold); margin-bottom: 4vh; text-shadow: .4vw .4vw 0 #000; text-transform: uppercase; }
+  .scoreTable { width: 100%; max-width: 60vw; border-collapse: collapse; margin-top: 2vh; }
+  .scoreTable th, .scoreTable td { padding: 1.5vh 2vw; text-align: left; font-size: 1.5vw; }
+  .scoreTable th { border-bottom: .4vw solid var(--line); color: var(--dim); text-transform: uppercase; font-size: 1.1vw; }
+  .scoreTable tr { border-bottom: .2vw solid rgba(58, 58, 106, 0.4); }
+  .scoreTable tr.hs-rank-0 { animation: scoreBlink 1.5s steps(1) infinite; }
+  @keyframes scoreBlink { 50% { border-color: var(--gold); } }
+
+  .color-text-blau { color: var(--blue); }
+  .color-text-rot { color: var(--red); }
+  .color-text-gruen { color: var(--gruen); }
+  .color-text-gelb { color: var(--gelb); }
+  .color-text-orange { color: var(--orange); }
+  .color-text-pink { color: var(--pink); }
+  .color-text-violett { color: var(--violett); }
+  .color-text-cyan { color: var(--cyan); }
+  .color-text-braun { color: var(--braun); }
+  .color-text-weiss { color: var(--weiss); }
 
   /* Finale */
   #winnerTitle { font-size: 4.5vw; line-height: 1.8; text-align: center; text-shadow: .5vw .5vw 0 #000; }
-  #winnerTitle.blau { color: var(--blue); } #winnerTitle.rot { color: var(--red); } #winnerTitle.tie { color: var(--gold); }
+  #winnerTitle.blau { color: var(--blue); } 
+  #winnerTitle.rot { color: var(--red); } 
+  #winnerTitle.gruen { color: var(--gruen); } 
+  #winnerTitle.gelb { color: var(--gelb); } 
+  #winnerTitle.orange { color: var(--orange); } 
+  #winnerTitle.pink { color: var(--pink); } 
+  #winnerTitle.violett { color: var(--violett); } 
+  #winnerTitle.cyan { color: var(--cyan); } 
+  #winnerTitle.braun { color: var(--braun); } 
+  #winnerTitle.weiss { color: var(--weiss); } 
+  #winnerTitle.tie { color: var(--gold); }
   #finalScores { font-size: 1.8vw; color: var(--dim); margin-top: 4vh; }
   .msg { font-size: 1.8vw; color: var(--dim); text-align: center; line-height: 2; }
   /* Highscore-Liste */
@@ -103,6 +140,13 @@
   /* QR-Code Lobby */
   #lobbyQr { width: 14vw; height: 14vw; margin-top: 4vh; border: .4vw solid var(--line); background: var(--panel); }
   #lobbyQr img { width: 100%; height: 100%; display: block; }
+  
+  /* Music Widget */
+  .music-pulse { animation: musicPulse 1.2s infinite alternate ease-in-out; display: inline-block; }
+  @keyframes musicPulse {
+    0% { transform: scale(1); opacity: 0.7; }
+    100% { transform: scale(1.15); opacity: 1; }
+  }
 </style>
 </head>
 <body>
@@ -113,9 +157,12 @@
   <div class="screen" id="s-lobby">
     <div id="lobbyCode">······</div>
     <div class="lobbyHint">Handy → <span id="joinUrl"></span> → Code eingeben <span class="blink">▮</span></div>
-    <div class="lobbySlots">
-      <div class="lslot" id="tslot0">P1 wartet…</div>
-      <div class="lslot" id="tslot1">P2 wartet…</div>
+    <div class="lobbySlots" id="tvLobbySlots"></div>
+    <div style="font-size: 1.1vw; color: var(--dim); margin-top: 3vh; line-height: 1.6; max-width: 60vw; text-align: center; border: .3vw solid var(--line); padding: 1vh 2vw; background: var(--panel);">
+      ★ SPIELREGELN ★<br>
+      1. QR-Code scannen & mitspielen (2 bis 10 Spieler).<br>
+      2. Richtige Antworten bringen 100 Punkte.<br>
+      3. Wer zuerst richtig antwortet, kriegt +50 Punkte Speed-Bonus!
     </div>
     <div id="lobbyQr"><img id="lobbyQrImg" alt="QR-Code"></div>
   </div>
@@ -131,22 +178,41 @@
     <div id="tvQmeta"></div>
     <div id="tvQuestion"></div>
     <div class="tvAnswers" id="tvAnswers"></div>
-    <div class="lockinfo">
-      <span class="blau" id="lockBlau">□ Blau überlegt…</span>
-      <span class="rot" id="lockRot">□ Rot überlegt…</span>
-    </div>
+    <div class="lockinfo" id="tvLockInfo"></div>
   </div>
 
   <div class="screen" id="s-score">
-    <div class="half blau"><div class="pname" id="nameBlau"></div><div class="pscore" id="scoreBlau">0</div></div>
-    <div class="vs">VS</div>
-    <div class="half rot"><div class="pname" id="nameRot"></div><div class="pscore" id="scoreRot">0</div></div>
+    <h2>★ Spielstand ★</h2>
+    <table class="scoreTable">
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Spieler</th>
+          <th>Punkte</th>
+        </tr>
+      </thead>
+      <tbody id="tvScoreboardBody"></tbody>
+    </table>
   </div>
+
 
   <div class="screen" id="s-final">
     <div id="winnerTitle"></div>
     <div id="finalScores"></div>
     <div id="highscoreList"></div>
+  </div>
+
+  <!-- Retro Musik-Anzeige -->
+  <div id="musicWidget" style="position: fixed; bottom: 3vh; right: 3vw; font-size: 0.9vw; color: var(--dim); z-index: 90; background: var(--panel); border: .3vw solid var(--line); padding: 1.5vh 2vw; display: flex; align-items: center; gap: 1.5vw; box-shadow: .4vw .4vw 0 #000; line-height: 1.5;">
+    <div class="music-pulse" style="font-size: 2.2vw; color: var(--gold);">♫</div>
+    <div>
+      <div style="color: var(--gold); font-size: 0.75vw; text-transform: uppercase; letter-spacing: 0.1em; font-weight: bold;">soundtrack</div>
+      <div id="currentSongTitle" style="color: var(--white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 18vw; margin: 0.6vh 0; font-size: 1vw;">Lädt...</div>
+      <div style="font-size: 0.7vw; display: flex; gap: 1.5vw;">
+        <span>VOL: <span id="musicVolVal" style="color: var(--blue);">50%</span></span>
+        <span>SPD: <span id="musicSpdVal" style="color: var(--red);">1.0x</span></span>
+      </div>
+    </div>
   </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -193,15 +259,41 @@ const urlCode = new URLSearchParams(location.search).get("code");
 if (urlCode) socket.on("connect", () => joinRoom(urlCode));
 
 // ── Spielanzeige ───────────────────────────────────────
-socket.on("player_joined", ({ players }) => {
-  ["tslot0", "tslot1"].forEach((id, i) => {
+let activePlayers = [];
+let maxPlayers = 2;
+
+const colorsText = {
+  blau: "Blau", rot: "Rot", gruen: "Grün", gelb: "Gelb", orange: "Orange",
+  pink: "Pink", violett: "Violett", cyan: "Cyan", braun: "Braun", weiss: "Weiß"
+};
+
+function renderLobbySlots(players, limit) {
+  if (limit) maxPlayers = limit;
+  const container = $("tvLobbySlots");
+  container.innerHTML = "";
+  
+  for (let i = 0; i < maxPlayers; i++) {
     const p = players[i];
-    if (p) { $(id).textContent = p.name; $(id).className = "lslot filled " + p.color; }
-  });
+    const slot = document.createElement("div");
+    if (p) {
+      slot.className = "lslot filled " + p.color;
+      slot.textContent = p.name;
+    } else {
+      slot.className = "lslot";
+      slot.textContent = `P${i+1} wartet…`;
+    }
+    container.appendChild(slot);
+  }
+}
+
+socket.on("player_joined", ({ players, maxPlayers: limit }) => {
+  activePlayers = players;
+  renderLobbySlots(players, limit);
 });
 
 socket.on("category_select", ({ chooserName, chooserColor }) => {
-  $("catMsg").innerHTML = `<span style="color:var(--${chooserColor === "blau" ? "blue" : "red"})">${chooserName}</span><br>wählt die Kategorie<span class="blink">▮</span>`;
+  const colText = colorsText[chooserColor] || chooserColor.toUpperCase();
+  $("catMsg").innerHTML = `<span class="color-text-${chooserColor}">${chooserName} (${colText})</span><br>wählt die Kategorie<span class="blink">▮</span>`;
   show("s-catwait");
 });
 
@@ -219,10 +311,13 @@ socket.on("next_question", d => {
     box.appendChild(el);
     return el;
   });
-  $("barBlau").classList.remove("locked");
-  $("barRot").classList.remove("locked");
-  $("lockBlau").textContent = "□ Blau überlegt…"; $("lockBlau").classList.remove("locked");
-  $("lockRot").textContent = "□ Rot überlegt…"; $("lockRot").classList.remove("locked");
+  
+  // Dynamic lockinfo list
+  const lockBox = $("tvLockInfo");
+  lockBox.innerHTML = activePlayers.map(p => `
+    <span class="color-${p.color}" id="lock-${p.color}">□ ${p.name} überlegt…</span>
+  `).join("");
+  
   $("tvTimer").classList.remove("hot");
   show("s-question");
 });
@@ -234,8 +329,12 @@ socket.on("timer_tick", ({ remaining }) => {
 
 // TV zeigt nur DASS jemand geantwortet hat, nie WAS.
 socket.on("lock_answer", ({ color }) => {
-  if (color === "blau") { $("barBlau").classList.add("locked"); $("lockBlau").textContent = "■ Blau hat geantwortet"; $("lockBlau").classList.add("locked"); }
-  if (color === "rot")  { $("barRot").classList.add("locked");  $("lockRot").textContent = "■ Rot hat geantwortet";  $("lockRot").classList.add("locked"); }
+  const el = $("lock-" + color);
+  if (el) {
+    el.classList.add("locked");
+    const p = activePlayers.find(pl => pl.color === color);
+    el.textContent = `■ ${p ? p.name : color.toUpperCase()} bereit`;
+  }
 });
 
 socket.on("reveal_answer", ({ correctIndex }) => {
@@ -243,11 +342,26 @@ socket.on("reveal_answer", ({ correctIndex }) => {
 });
 
 socket.on("update_score", ({ players }) => {
-  const blau = players.find(p => p.color === "blau"), rot = players.find(p => p.color === "rot");
-  if (blau) { $("nameBlau").textContent = blau.name; $("scoreBlau").textContent = blau.score; }
-  if (rot)  { $("nameRot").textContent = rot.name;  $("scoreRot").textContent = rot.score; }
+  activePlayers = players;
+  const tbody = $("tvScoreboardBody");
+  tbody.innerHTML = "";
+  
+  // Sort players by score descending
+  const sorted = [...players].sort((a, b) => b.score - a.score);
+  
+  sorted.forEach((p, idx) => {
+    const tr = document.createElement("tr");
+    tr.className = `hs-rank-${idx}`;
+    tr.innerHTML = `
+      <td>${idx + 1}.</td>
+      <td class="color-text-${p.color}">${p.name}</td>
+      <td>${p.score} Pkt</td>
+    `;
+    tbody.appendChild(tr);
+  });
   show("s-score");
 });
+
 
 socket.on("game_finished", ({ players, winner }) => {
   const t = $("winnerTitle");
@@ -281,6 +395,113 @@ socket.on("game_aborted", ({ reason }) => {
   $("s-idle").querySelector(".msg").textContent = "Spiel abgebrochen: " + reason;
   show("s-idle");
 });
+
+// ── Audio-Player Steuerung ──────────────────────────────
+let audio = new Audio();
+let playlist = [];
+let currentIndex = -1;
+let currentVolume = 0.5;
+let currentSpeed = 1.0;
+
+function updateMusicWidget(filename) {
+  const title = filename.replace(/\.[^/.]+$/, "");
+  $("currentSongTitle").textContent = title;
+  $("musicVolVal").textContent = Math.round(currentVolume * 100) + "%";
+  $("musicSpdVal").textContent = currentSpeed.toFixed(1) + "x";
+}
+
+function playSong(filename) {
+  if (!filename) return;
+  audio.src = "/sounds/" + encodeURIComponent(filename);
+  audio.volume = currentVolume;
+  audio.playbackRate = currentSpeed;
+  audio.play()
+    .then(() => {
+      updateMusicWidget(filename);
+    })
+    .catch(err => {
+      console.log("Autoplay blocked or audio error.", err);
+      updateMusicWidget(filename + " (Klicke für Ton)");
+      
+      // Fallback: Klick auf die Seite aktiviert Ton
+      const resumeAudio = () => {
+        audio.play().then(() => {
+          updateMusicWidget(filename);
+          document.removeEventListener("click", resumeAudio);
+          document.removeEventListener("touchstart", resumeAudio);
+        }).catch(e => console.log("Failed to resume playback on click", e));
+      };
+      document.addEventListener("click", resumeAudio);
+      document.addEventListener("touchstart", resumeAudio);
+    });
+}
+
+function initAudio() {
+  fetch("/api/sounds")
+    .then(r => r.json())
+    .then(files => {
+      if (!files || !files.length) {
+        $("currentSongTitle").textContent = "Keine Musik gefunden";
+        return;
+      }
+      
+      const firstSongName = "Quizzcast - Mime.mp3";
+      const hasFirstSong = files.includes(firstSongName);
+      let otherSongs = files.filter(f => f !== firstSongName);
+      
+      // Shuffle other songs
+      otherSongs.sort(() => Math.random() - 0.5);
+      
+      if (hasFirstSong) {
+        playlist = [firstSongName, ...otherSongs];
+      } else {
+        playlist = otherSongs;
+      }
+      
+      currentIndex = 0;
+      playSong(playlist[currentIndex]);
+    })
+    .catch(e => {
+      console.error("Fehler beim Laden der Musikdateien", e);
+      $("currentSongTitle").textContent = "Musikfehler";
+    });
+}
+
+audio.addEventListener("ended", () => {
+  if (!playlist.length) return;
+  currentIndex = (currentIndex + 1) % playlist.length;
+  playSong(playlist[currentIndex]);
+});
+
+// Socket listeners for sound sync
+socket.on("init_audio_settings", ({ volume, speed }) => {
+  currentVolume = volume;
+  currentSpeed = speed;
+  audio.volume = volume;
+  audio.playbackRate = speed;
+  if (playlist[currentIndex]) {
+    updateMusicWidget(playlist[currentIndex]);
+  }
+});
+
+socket.on("volume_changed", ({ volume }) => {
+  currentVolume = volume;
+  audio.volume = volume;
+  if (playlist[currentIndex]) {
+    updateMusicWidget(playlist[currentIndex]);
+  }
+});
+
+socket.on("speed_changed", ({ speed }) => {
+  currentSpeed = speed;
+  audio.playbackRate = speed;
+  if (playlist[currentIndex]) {
+    updateMusicWidget(playlist[currentIndex]);
+  }
+});
+
+// Start initialization on window load
+window.addEventListener("load", initAudio);
 </script>
 <!-- CAF Receiver SDK: laedt nur auf dem Chromecast wirklich, im Browser harmlos -->
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>

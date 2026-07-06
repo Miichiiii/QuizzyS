@@ -14,7 +14,7 @@ const SCOREBOARD_MS = parseInt(process.env.SCOREBOARD_MS || "3000", 10);
 const RECONNECT_TIMEOUT_MS = parseInt(process.env.RECONNECT_TIMEOUT_MS || "60000", 10);
 const QUESTIONS_PER_GAME = 5;
 
-const COLORS = ["blau", "rot"];
+const COLORS = ["blau", "rot", "gruen", "gelb", "orange", "pink", "violett", "cyan", "braun", "weiss"];
 
 class GameRoom {
   constructor(code, io) {
@@ -31,6 +31,9 @@ class GameRoom {
     this.tickInterval = null;
     this.pendingTimeout = null;
     this.finished = false;
+    this.maxPlayers = 2; // Standard: 2 Spieler, Host kann auf bis zu 10 erhoehen
+    this.musicVolume = 0.5;
+    this.musicSpeed = 1.0;
     // v2 Reconnect: color -> { name, score, answerThisRound, reconnectTimer }
     this.disconnectedPlayers = new Map();
   }
@@ -47,19 +50,21 @@ class GameRoom {
 
   addPlayer(socketId, name) {
     if (this.state !== "WAITING_FOR_PLAYERS") return { ok: false, error: "Spiel läuft bereits oder existiert nicht." };
-    if (this.players.length >= 2) return { ok: false, error: "Raum ist voll (max. 2 Spieler)." };
-    const color = COLORS[this.players.length]; // fix: erster blau, zweiter rot
+    if (this.players.length >= this.maxPlayers) return { ok: false, error: `Raum ist voll (max. ${this.maxPlayers} Spieler).` };
+    const color = COLORS[this.players.length];
     const player = { socketId, name: String(name || "Spieler").slice(0, 20), color, score: 0 };
     this.players.push(player);
     // Getrennte Events (Spec-Warnung): player_joined NUR fuer Lobby-Update.
-    this.broadcast("player_joined", { players: this.publicPlayers() });
+    this.broadcast("player_joined", { players: this.publicPlayers(), maxPlayers: this.maxPlayers });
     return { ok: true, color, code: this.code };
   }
 
   addSpectator(socketId) {
     this.spectators.add(socketId);
     // Spectator bekommt den aktuellen Lobby-Stand sofort, egal wann er joint.
-    this.io.to(socketId).emit("player_joined", { players: this.publicPlayers() });
+    this.io.to(socketId).emit("player_joined", { players: this.publicPlayers(), maxPlayers: this.maxPlayers });
+    // Audio initialisieren
+    this.io.to(socketId).emit("init_audio_settings", { volume: this.musicVolume, speed: this.musicSpeed });
   }
 
   // v2: Host kickt Spieler aus der Lobby.
@@ -74,8 +79,23 @@ class GameRoom {
     this.players.forEach((p, i) => { p.color = COLORS[i]; });
     // Dem gekickten Spieler direkt Bescheid geben.
     this.io.to(kicked.socketId).emit("kicked", { reason: "Du wurdest vom Host aus dem Spiel entfernt." });
-    this.broadcast("player_joined", { players: this.publicPlayers() });
+    this.broadcast("player_joined", { players: this.publicPlayers(), maxPlayers: this.maxPlayers });
     return { ok: true, kickedSocketId: kicked.socketId };
+  }
+
+  changePlayerLimit(hostSocketId, limit) {
+    if (hostSocketId !== this.hostSocketId) return { ok: false, error: "Nur der Host darf das Spielerlimit ändern." };
+    if (this.state !== "WAITING_FOR_PLAYERS") return { ok: false, error: "Spielerlimit kann nur in der Lobby geändert werden." };
+    const newLimit = parseInt(limit, 10);
+    if (isNaN(newLimit) || newLimit < 2 || newLimit > 10) {
+      return { ok: false, error: "Spielerlimit muss zwischen 2 und 10 liegen." };
+    }
+    if (newLimit < this.players.length) {
+      return { ok: false, error: "Spielerlimit kann nicht kleiner als die aktuelle Spielerzahl sein." };
+    }
+    this.maxPlayers = newLimit;
+    this.broadcast("player_joined", { players: this.publicPlayers(), maxPlayers: this.maxPlayers });
+    return { ok: true, maxPlayers: this.maxPlayers };
   }
 
   // v2: Spieler hat Verbindung verloren – Slot 60s offen halten.
@@ -114,7 +134,7 @@ class GameRoom {
       this.answers[newSocketId] = entry.answerThisRound;
       // Alte socketId-Schluesselbindung entfernen (war aber schon verloren).
     }
-    this.broadcast("player_joined", { players: this.publicPlayers() });
+    this.broadcast("player_joined", { players: this.publicPlayers(), maxPlayers: this.maxPlayers });
     // Reconnected Spieler bekommt aktuellen State-Snapshot.
     const snap = this._stateSnapshot();
     this.io.to(newSocketId).emit("reconnect_ok", snap);
@@ -123,7 +143,7 @@ class GameRoom {
 
   // Liefert einen Snapshot des aktuellen Spielstands fuer den reconnecteten Spieler.
   _stateSnapshot() {
-    const base = { state: this.state, players: this.publicPlayers() };
+    const base = { state: this.state, players: this.publicPlayers(), maxPlayers: this.maxPlayers };
     if (this.state === "QUESTION_ACTIVE" || this.state === "ANSWER_LOCKED") {
       const q = this.questions[this.currentIndex];
       const elapsed = Math.floor((Date.now() - this.questionStartedAt) / 1000);
@@ -151,7 +171,8 @@ class GameRoom {
   // Host drueckt Start. Getrenntes Event game_starting (Spec-Warnung: NICHT game_ready doppelt nutzen).
   start(socketId) {
     if (socketId !== this.hostSocketId) return { ok: false, error: "Nur der Host darf starten." };
-    if (this.players.length !== 2) return { ok: false, error: "Es müssen genau 2 Spieler im Raum sein." };
+    if (this.players.length < 2) return { ok: false, error: "Es müssen mindestens 2 Spieler im Raum sein." };
+    if (this.players.length !== this.maxPlayers) return { ok: false, error: `Es müssen genau ${this.maxPlayers} Spieler im Raum sein.` };
     if (this.state !== "WAITING_FOR_PLAYERS") return { ok: false, error: "Spiel wurde bereits gestartet." };
     this.state = "CATEGORY_SELECT";
     this.broadcast("game_starting", { players: this.publicPlayers() });
@@ -268,9 +289,23 @@ class GameRoom {
     this.state = "GAME_FINISHED";
     this.finished = true;
     this.clearTimers();
-    const [a, b] = this.players;
+    
+    let maxScore = -1;
+    let winners = [];
+    for (const p of this.players) {
+      if (p.score > maxScore) {
+        maxScore = p.score;
+        winners = [p];
+      } else if (p.score === maxScore) {
+        winners.push(p);
+      }
+    }
+    
     let winner = null; // null = Unentschieden
-    if (a && b) winner = a.score === b.score ? null : (a.score > b.score ? a.color : b.color);
+    if (winners.length === 1 && this.players.length >= 2) {
+      winner = winners[0].color;
+    }
+    
     this.broadcast("game_finished", { players: this.publicPlayers(), winner });
     // v2: Optionaler Callback fuer Persistenz (DB-Schreiben in server.js, nicht hier).
     if (typeof this.onFinish === "function") this.onFinish(this.publicPlayers(), winner);

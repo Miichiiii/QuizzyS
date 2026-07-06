@@ -1,6 +1,6 @@
-# QuizCast - 8-Bit 2-Spieler Quiz
+# QuizCast - 8-Bit Multiplayer Quiz (2-10 Spieler)
 
-Ein kleines Arcade-Quiz fuer Chrome, Chromecast und Browser-Fallback.
+Ein kleines Arcade-Quiz fuer Chrome, Chromecast und Browser-Fallback fuer bis zu 10 Spieler.
 Node.js, Express und Socket.io sind die Arcade-Maschine dahinter.
 Der Server ist die Single Source of Truth: Timer, Punkte und Antwort-Pruefung laufen serverseitig.
 
@@ -25,11 +25,11 @@ Der Host erstellt einen Raum, Spieler joinen per Code, und der Receiver kann im 
 
 ## So laeuft das Spiel
 
-1. Host startet das Spiel und bekommt einen 6-stelligen Code.
-2. Zwei Spieler joinen ueber den Player-Link.
-3. Blau waehlt die Kategorie.
-4. Der Server laedt 5 Fragen nach und rechnet die Punkte.
-5. Am Ende werden Sieger und Highscores gezeigt.
+1. Host erstellt das Spiel, waehlt das Spielerlimit (2 bis 10) und bekommt einen 6-stelligen Code.
+2. Spieler joinen ueber den Player-Link (bis das Limit erreicht ist).
+3. P1 (Blau) waehlt die Kategorie.
+4. Der Server laedt 5 Fragen nach und rechnet die Punkte (100 Pkt fuer richtige Antwort, +50 Pkt Speed-Bonus fuer die schnellste korrekte Antwort).
+5. Am Ende werden Sieger und die aktuellen Scores auf der dynamic Bestenliste des TVs gezeigt.
 
 ## Wenn du echtes Chrome-Casting willst
 
@@ -55,9 +55,9 @@ Die UI ist bewusst als kleine Retro-Arena gebaut.
 
 - Press-Start-2P-Schrift
 - CRT-Scanlines
-- Blau und Rot als Teamfarben
+- 10 verschiedene Teamfarben fuer bis zu 10 Einzelspieler-Slots (Blau, Rot, Gruen, Gelb, Orange, Pink, Violett, Cyan, Braun, Weiss)
 - Grobe Pixel-Kanten statt glatter App-Optik
-- Getrennte Screens fuer Host, Player und TV
+- Getrennte Screens fuer Host, Player und TV (mit dynamischer Bestenliste)
 
 ## Testen
 
