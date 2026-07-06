@@ -202,6 +202,21 @@ io.on("connection", (socket) => {
   socket.on("submit_answer", (payload, cb) => {
     const room = rooms.get((payload?.code || "").toUpperCase());
     if (!room) return cb && cb({ ok: false, error: "Raum nicht gefunden." });
+
+  socket.on("use_joker", (payload, cb) => {
+    const room = rooms.get((payload?.code || "").toUpperCase());
+    if (!room) return cb && cb({ ok: false, error: "Raum nicht gefunden" });
+    const res = room.useJoker(socket.id);
+    if (cb) cb(res);
+  });
+
+  socket.on("reaction", (payload) => {
+    const room = rooms.get((payload?.code || "").toUpperCase());
+    if (room) {
+      room.broadcastTv("tv_reaction", { emoji: payload.emoji, color: payload.color });
+    }
+  });
+
     const result = room.submitAnswer(socket.id, payload?.answerIndex);
     if (cb) cb(result);
   });

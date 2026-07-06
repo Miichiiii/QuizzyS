@@ -208,7 +208,13 @@ function saveSession(code, color, name) {
 function clearSession() { sessionStorage.removeItem("qc_code"); sessionStorage.removeItem("qc_color"); sessionStorage.removeItem("qc_name"); }
 
 // Bei (Re-)Connect: gespeicherte Session automatisch nutzen.
-socket.on("connect", () => {
+
+  window.sendReaction = (emoji) => {
+    playClick();
+    socket.emit("reaction", { code: gameCode, color: myColor, emoji });
+  };
+
+  socket.on("connect", () => {
   const savedCode = sessionStorage.getItem("qc_code");
   const savedColor = sessionStorage.getItem("qc_color");
   const savedName = sessionStorage.getItem("qc_name");
