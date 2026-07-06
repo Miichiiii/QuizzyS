@@ -167,9 +167,14 @@
       <h3 style="color: var(--gold); font-size: 11px; margin-bottom: 20px; text-transform: uppercase; text-align: center; letter-spacing: 0.1em; font-family: inherit;">★ TV VERBINDEN ★</h3>
       
       <!-- Chromecast Option -->
-      <div id="chromecastOption" style="display: none; margin-bottom: 24px; border-bottom: 2px dashed var(--line); padding-bottom: 20px; text-align: center;">
+      <div id="chromecastOption" style="margin-bottom: 24px; border-bottom: 2px dashed var(--line); padding-bottom: 20px; text-align: center;">
         <div style="color: var(--white); margin-bottom: 12px;">CHROMECAST / GOOGLE CAST:</div>
-        <button id="modalCastBtn" style="font-size: 9px; padding: 12px; background: var(--blue); border-color: var(--white); width: 100%;">Auf TV casten</button>
+        <button id="modalCastBtn" style="display: none; font-size: 9px; padding: 12px; background: var(--blue); border-color: var(--white); width: 100%;">Auf TV casten</button>
+        <div id="chromecastHelpText" style="color: var(--dim); font-size: 7px; line-height: 1.6;">
+          Casting inaktiv.<br>
+          <span style="color: var(--gold);">Erfordert HTTPS + registrierte Cast App ID.</span><br>
+          Nutze stattdessen die Browser-Verbindung unten.
+        </div>
       </div>
 
       <!-- TV Browser Option -->
@@ -206,7 +211,16 @@ let CAST_APP_ID = "";
 // Config vom Server laden (einmalig beim Start).
 fetch("/api/config").then(r => r.json()).then(cfg => {
   CAST_APP_ID = cfg.castAppId || "";
-}).catch(() => {});
+  
+  // Cast SDK Script erst laden, wenn die CAST_APP_ID vorliegt, um Race Condition zu vermeiden
+  const script = document.createElement("script");
+  script.src = "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
+  document.body.appendChild(script);
+}).catch(() => {
+  const script = document.createElement("script");
+  script.src = "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
+  document.body.appendChild(script);
+});
 
 const $ = id => document.getElementById(id);
 $("playerUrl").textContent = location.origin + "/player/";
@@ -424,10 +438,10 @@ window.__onGCastApiAvailable = (available) => {
   );
   chrome.cast.initialize(config, () => {
     castReady = true;
-    $("chromecastOption").style.display = "block";
+    $("modalCastBtn").style.display = "block";
+    $("chromecastHelpText").style.display = "none";
   }, () => {});
 };
 </script>
-<script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
 </body>
 </html>
