@@ -147,6 +147,28 @@
     0% { transform: scale(1); opacity: 0.7; }
     100% { transform: scale(1.15); opacity: 1; }
   }
+
+  /* Tutorial Video (Attract Mode) */
+  .tutorial-video {
+    width: 14vw; height: 14vw; border: .4vw solid var(--line);
+    background: var(--bg); position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .tut-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; animation-duration: 12s; animation-iteration-count: infinite; }
+  .tut-phone { width: 5vw; height: 8vw; border: .3vw solid var(--dim); border-radius: .5vw; background: var(--panel); position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 1vh; }
+  .tut-phone::after { content: ""; width: 1.5vw; height: .3vw; background: var(--dim); position: absolute; bottom: .5vw; border-radius: .2vw; }
+  .tut-qr-scan { width: 3vw; height: 3vw; border: .2vw dashed var(--good); animation: tutScan 1s infinite alternate; }
+  
+  .tut-1 { animation-name: tutSlide1; }
+  .tut-2 { animation-name: tutSlide2; }
+  .tut-3 { animation-name: tutSlide3; }
+  .tut-4 { animation-name: tutSlide4; }
+
+  @keyframes tutScan { 0% { transform: scale(0.9); border-color: var(--blue); } 100% { transform: scale(1.1); border-color: var(--good); } }
+  @keyframes tutSlide1 { 0%, 20% { opacity: 1; } 25%, 100% { opacity: 0; } }
+  @keyframes tutSlide2 { 0%, 20% { opacity: 0; } 25%, 45% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  @keyframes tutSlide3 { 0%, 45% { opacity: 0; } 50%, 70% { opacity: 1; } 75%, 100% { opacity: 0; } }
+  @keyframes tutSlide4 { 0%, 70% { opacity: 0; } 75%, 95% { opacity: 1; } 100% { opacity: 0; } }
 </style>
 </head>
 <body>
@@ -174,7 +196,47 @@
       2. Richtige Antworten bringen 100 Punkte.<br>
       3. Wer zuerst richtig antwortet, kriegt +50 Punkte Speed-Bonus!
     </div>
-    <div id="lobbyQr"><img id="lobbyQrImg" alt="QR-Code"></div>
+    <div style="display: flex; gap: 4vw; margin-top: 4vh; align-items: center;">
+      <!-- QR Code -->
+      <div style="text-align: center;">
+        <div style="color: var(--gold); font-size: 0.9vw; margin-bottom: 1vh;">1. QR-CODE SCANNEN</div>
+        <div id="lobbyQr" style="margin-top: 0;"><img id="lobbyQrImg" alt="QR-Code"></div>
+      </div>
+      <!-- Tutorial Video (Attract Mode) -->
+      <div style="text-align: center;">
+        <div style="color: var(--blue); font-size: 0.9vw; margin-bottom: 1vh;">2. HOW TO PLAY (DEMO)</div>
+        <div class="tutorial-video">
+          <!-- Step 1: Scan -->
+          <div class="tut-screen tut-1">
+            <div class="tut-phone"><div class="tut-qr-scan"></div></div>
+            <div style="color: var(--dim); font-size: 0.7vw;">Scannen...</div>
+          </div>
+          <!-- Step 2: Name eingeben -->
+          <div class="tut-screen tut-2">
+            <div class="tut-phone">
+              <div style="width: 3.5vw; height: .5vw; background: var(--dim); margin-bottom: .5vh;"></div>
+              <div style="width: 3.5vw; height: 1vw; background: var(--good);"></div>
+            </div>
+            <div style="color: var(--white); font-size: 0.7vw;">Name eingeben</div>
+          </div>
+          <!-- Step 3: Antwort wählen -->
+          <div class="tut-screen tut-3">
+            <div class="tut-phone" style="display: grid; grid-template-columns: 1fr 1fr; gap: .2vw; padding: .5vw; place-items: center;">
+              <div style="width: 1.5vw; height: 1.5vw; background: var(--blue);"></div>
+              <div style="width: 1.5vw; height: 1.5vw; background: var(--red);"></div>
+              <div style="width: 1.5vw; height: 1.5vw; background: var(--gold);"></div>
+              <div style="width: 1.5vw; height: 1.5vw; background: var(--gruen);"></div>
+            </div>
+            <div style="color: var(--dim); font-size: 0.7vw;">Antwort wählen</div>
+          </div>
+          <!-- Step 4: Gewinnen -->
+          <div class="tut-screen tut-4">
+            <div style="font-size: 4vw; color: var(--gold);">★</div>
+            <div style="color: var(--good); font-size: 0.9vw;">Gewonnen!</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="screen" id="s-catwait"><div class="msg" id="catMsg"></div></div>

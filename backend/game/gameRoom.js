@@ -306,7 +306,14 @@ class GameRoom {
       winner = winners[0].color;
     }
     
-    this.broadcast("game_finished", { players: this.publicPlayers(), winner });
+    const finalLog = this.questions.map(q => ({
+      category: q.category,
+      question: q.question,
+      answers: q.answers,
+      correctIndex: q.correctIndex
+    }));
+    
+    this.broadcast("game_finished", { players: this.publicPlayers(), winner, log: finalLog });
     // v2: Optionaler Callback fuer Persistenz (DB-Schreiben in server.js, nicht hier).
     if (typeof this.onFinish === "function") this.onFinish(this.publicPlayers(), winner);
   }

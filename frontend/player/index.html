@@ -147,9 +147,22 @@
 
   <!-- Spielende -->
   <div class="screen" id="s-final">
-    <div class="center">
-      <div class="big" id="finalMsg"></div>
-      <div class="dim" id="finalScore"></div>
+    <div id="zeugnisCard" style="background: var(--panel); border: 4px solid var(--line); padding: 20px; width: 100%; max-width: 400px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; position: relative;">
+      <h2 style="text-align: center; color: var(--gold); margin: 0 0 10px; font-size: 14px; text-transform: uppercase;">★ Zeugnis ★</h2>
+      
+      <div style="text-align: center;">
+        <div id="finalMsg" style="font-size: 16px; margin-bottom: 8px;"></div>
+        <div id="finalScore" style="color: var(--dim); font-size: 10px; line-height: 1.6;"></div>
+      </div>
+      
+      <div id="zeugnisLog" style="margin-top: 10px; display: flex; flex-direction: column; gap: 12px; border-top: 2px dashed var(--line); padding-top: 14px;">
+        <!-- Log entries will go here -->
+      </div>
+    </div>
+    
+    <div style="margin-top: 20px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 12px; margin-left: auto; margin-right: auto;">
+      <button id="shareBtn" style="background: var(--blue); border-color: var(--white); font-size: 10px; padding: 14px;">📸 Auf Insta / FB teilen</button>
+      <button id="closeBtn" style="background: var(--panel); border-color: var(--dim); color: var(--dim); font-size: 9px; padding: 12px; box-shadow: 3px 3px 0 #000;">Schließen</button>
     </div>
   </div>
 
@@ -321,12 +334,42 @@ socket.on("reveal_answer", ({ results }) => {
   show("s-result");
 });
 
-socket.on("game_finished", ({ players, winner }) => {
+socket.on("game_finished", ({ players, winner, log }) => {
   clearSession();
+  const me = players.find(p => p.color === myColor) || { score: 0 };
+  
   if (winner === null) $("finalMsg").textContent = "Unentschieden!";
-  else if (winner === myColor) $("finalMsg").textContent = "★ You Win! ★";
-  else $("finalMsg").textContent = "Game Over…";
-  $("finalScore").textContent = players.map(p => `${p.name}: ${p.score}`).join("  ·  ");
+  else if (winner === myColor) $("finalMsg").textContent = "★ SIEGER ★";
+  else $("finalMsg").textContent = "Game Over";
+  
+  if (winner === myColor) {
+    $("finalMsg").className = "result-gold";
+  } else {
+    $("finalMsg").className = "result-bad";
+  }
+  
+  $("finalScore").textContent = `Dein Score: ${me.score} Pkt\n\n` + players.map(p => `${p.name}: ${p.score}`).join(" · ");
+  
+  // Render Log
+  const logBox = $("zeugnisLog");
+  logBox.innerHTML = "";
+  if (log && log.length) {
+    log.forEach((q, i) => {
+      const el = document.createElement("div");
+      el.style.fontSize = "8px";
+      el.style.lineHeight = "1.6";
+      el.style.color = "var(--white)";
+      el.style.background = "var(--bg)";
+      el.style.padding = "8px";
+      el.style.border = "2px solid var(--line)";
+      
+      const correctText = q.answers[q.correctIndex];
+      el.innerHTML = `<div style="color: var(--dim); margin-bottom: 4px;">Q${i+1}: ${q.question}</div>
+                      <div style="color: var(--good);">✓ ${correctText}</div>`;
+      logBox.appendChild(el);
+    });
+  }
+  
   show("s-final");
 });
 
@@ -343,6 +386,60 @@ socket.on("kicked", ({ reason }) => {
   $("finalScore").textContent = reason;
   show("s-final");
 });
+
+$("closeBtn").onclick = () => {
+  location.reload();
+};
+
+$("shareBtn").onclick = async () => {
+  if (typeof html2canvas === "undefined") {
+    alert("Teilen-Modul lädt noch, bitte kurz warten...");
+    return;
+  }
+  const btn = $("shareBtn");
+  const oldText = btn.textContent;
+  btn.textContent = "Generiere Bild...";
+  btn.disabled = true;
+  
+  try {
+    const canvas = await html2canvas($("zeugnisCard"), { backgroundColor: "#1a1a35", scale: 2 });
+    canvas.toBlob(blob => {
+      if (navigator.share && navigator.canShare) {
+        const file = new File([blob], "quizcast_zeugnis.png", { type: "image/png" });
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({
+            files: [file],
+            title: 'Mein QuizCast Ergebnis',
+            text: 'Wir haben gerade QuizCast gespielt!'
+          }).catch(e => console.log("Teilen abgebrochen", e));
+        } else {
+          fallbackDownload(blob);
+        }
+      } else {
+        fallbackDownload(blob);
+      }
+      btn.textContent = oldText;
+      btn.disabled = false;
+    }, "image/png");
+  } catch (e) {
+    console.error(e);
+    alert("Fehler beim Generieren des Bildes.");
+    btn.textContent = oldText;
+    btn.disabled = false;
+  }
+};
+
+function fallbackDownload(blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "quizcast_zeugnis.png";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </body>
 </html>
