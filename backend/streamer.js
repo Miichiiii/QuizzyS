@@ -2,7 +2,8 @@ const { spawn } = require('child_process');
 const ffmpegPath = require('ffmpeg-static');
 const path = require('path');
 const fs = require('fs');
-const { Canvas } = require('skia-canvas');
+const { Canvas, FontLibrary } = require('skia-canvas');
+FontLibrary.use('Press Start 2P', path.join(__dirname, 'fonts', 'PressStart2P-Regular.ttf'));
 
 class Streamer {
   constructor(roomCode) {
@@ -180,7 +181,7 @@ class Streamer {
     ctx.fill();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px sans-serif';
+    ctx.font = '14px "Press Start 2P"';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(`QUIZZY • RAUM ${this.roomCode}`, 70, 60);
@@ -216,34 +217,34 @@ class Streamer {
 
   drawLobby(ctx, width, height) {
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 50px sans-serif';
+    ctx.font = '14px "Press Start 2P"';
     ctx.textAlign = 'center';
     ctx.fillText("Willkommen in der Lobby!", width/2, height/2 - 50);
     
     ctx.fillStyle = '#a0aabf';
-    ctx.font = '30px sans-serif';
+    ctx.font = '16px "Press Start 2P"';
     ctx.fillText(`Auf dem Handy öffnen: ${this.state.joinUrl}`, width/2, height/2 + 30);
     
     ctx.fillStyle = '#35d07f';
-    ctx.font = 'bold 36px sans-serif';
+    ctx.font = '20px "Press Start 2P"';
     ctx.fillText(`Warte auf den Host...`, width/2, height/2 + 120);
   }
 
   drawCategory(ctx, width, height) {
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 50px sans-serif';
+    ctx.font = '14px "Press Start 2P"';
     ctx.textAlign = 'center';
     ctx.fillText("Kategorie wählen", width/2, height/2 - 30);
     
     ctx.fillStyle = '#35d07f';
-    ctx.font = '36px sans-serif';
+    ctx.font = '20px "Press Start 2P"';
     ctx.fillText(`${this.state.chooserName} wählt gerade aus...`, width/2, height/2 + 40);
   }
 
   drawQuestion(ctx, width, height) {
     // Question Text (Wrapped)
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 44px sans-serif';
+    ctx.font = '14px "Press Start 2P"';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const lines = this.wrapText(ctx, this.state.questionText, 1000);
@@ -291,14 +292,14 @@ class Streamer {
       
       // Letter
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.font = 'bold 60px sans-serif';
+      ctx.font = '36px "Press Start 2P"';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.fillText(letters[i], x + 25, y + boxH/2 + 5);
 
       // Text
       ctx.fillStyle = isWrong ? 'rgba(255,255,255,0.5)' : '#ffffff';
-      ctx.font = 'bold 32px sans-serif';
+      ctx.font = '18px "Press Start 2P"';
       
       // wrap answer if too long
       const ansLines = this.wrapText(ctx, this.state.answers[i], boxW - 120);
@@ -312,21 +313,21 @@ class Streamer {
 
   drawFinished(ctx, width, height) {
     ctx.fillStyle = '#f0c674';
-    ctx.font = 'bold 60px sans-serif';
+    ctx.font = '36px "Press Start 2P"';
     ctx.textAlign = 'center';
     ctx.fillText("ENDSTAND", width/2, 180);
     
-    ctx.font = '40px sans-serif';
+    ctx.font = '20px "Press Start 2P"';
     let y = 280;
     const top = this.state.ranking.slice(0, 5);
     for (let i = 0; i < top.length; i++) {
       const r = top[i];
       if (i === 0) {
         ctx.fillStyle = '#35d07f';
-        ctx.font = 'bold 48px sans-serif';
+        ctx.font = '14px "Press Start 2P"';
       } else {
         ctx.fillStyle = '#ffffff';
-        ctx.font = '36px sans-serif';
+        ctx.font = '20px "Press Start 2P"';
       }
       ctx.fillText(`${i + 1}. ${r.name} - ${r.score} Punkte`, width/2, y);
       y += 60;

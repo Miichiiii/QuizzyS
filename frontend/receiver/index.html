@@ -120,8 +120,14 @@
     <!-- LOBBY -->
     <div id="viewLobby" class="view">
       <div class="lobby-title">Willkommen in der Lobby!</div>
-      <div class="lobby-url" id="lobbyUrl"></div>
-      <div style="font-size: 36px; color: var(--green);">Warte auf den Host...</div>
+      <div style="display: flex; gap: 40px; align-items: center; justify-content: center; margin: 40px 0;">
+        <div id="tvQrCode" style="background: white; padding: 10px; border: 4px solid var(--line);"></div>
+        <div style="text-align: left;">
+          <div style="font-size: 24px; color: var(--dim); margin-bottom: 10px;">Scanne den Code oder öffne:</div>
+          <div class="lobby-url" id="lobbyUrl" style="margin: 0; margin-bottom: 30px;"></div>
+          <div style="font-size: 36px; color: var(--green);">Warte auf Spieler...</div>
+        </div>
+      </div>
     </div>
     
     <!-- CATEGORY -->
@@ -142,6 +148,7 @@
     </div>
   </div>
 
+  <script src="qrcode.min.js"></script>
   <script>
     const socket = io();
     const urlParams = new URLSearchParams(window.location.search);
@@ -171,7 +178,18 @@
     socket.on('tv_state', state => {
       if (state.view === 'LOBBY') {
         showView('LOBBY');
-        document.getElementById('lobbyUrl').innerText = `Handy: ${state.joinUrl}`;
+        document.getElementById('lobbyUrl').innerText = state.joinUrl;
+        
+        const qrContainer = document.getElementById('tvQrCode');
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, {
+          text: state.joinUrl,
+          width: 180,
+          height: 180,
+          colorDark : "#000000",
+          colorLight : "#ffffff",
+          correctLevel : QRCode.CorrectLevel.M
+        });
         document.getElementById('statsInfo').innerText = `Spieler: ${state.playerCount}`;
         document.getElementById('centerInfo').innerText = '';
       } else if (state.view === 'CATEGORY') {
@@ -213,15 +231,12 @@
         grid.appendChild(div);
       });
       
-      // Timer
-      if (timerInterval) clearInterval(timerInterval);
-      const updateTimer = () => {
-        const left = Math.max(0, Math.ceil((data.endsAt - Date.now()) / 1000));
-        document.getElementById('centerInfo').innerText = `Noch ${left}s`;
-        if (left <= 0) clearInterval(timerInterval);
-      };
-      updateTimer();
-      timerInterval = setInterval(updateTimer, 500);
+      // Timer (Sync)
+      document.getElementById('centerInfo').innerText = ``;
+    });
+
+    socket.on('tv_timer', data => {
+      document.getElementById('centerInfo').innerText = `Noch ${data.remaining}s`;
     });
 
     socket.on('tv_answers', data => {

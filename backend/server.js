@@ -20,7 +20,18 @@ const io = new Server(server, { cors: { origin: "*" } }); // Receiver laeuft auf
 const FRONTEND = path.join(__dirname, "..", "frontend");
 app.use(express.json()); // Fuer POST-Requests
 
-app.use("/host", express.static(path.join(FRONTEND, "host")));
+const HOST_PASSWORD = process.env.HOST_PASSWORD || "admin123";
+app.use("/host", (req, res, next) => {
+  const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+  const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+
+  if (password === HOST_PASSWORD || login === HOST_PASSWORD) {
+    return next();
+  }
+
+  res.set('WWW-Authenticate', 'Basic realm="QuizCast Host"');
+  res.status(401).send('Authentication required.');
+}, express.static(path.join(FRONTEND, "host")));
 app.use("/receiver", express.static(path.join(FRONTEND, "receiver")));
 app.use("/player", express.static(path.join(FRONTEND, "player")));
 app.use("/editor", express.static(path.join(FRONTEND, "editor")));
@@ -263,3 +274,18 @@ setInterval(() => {
 server.listen(PORT, () => console.log(`QuizCast läuft auf http://localhost:${PORT}`));
 
 module.exports = { server, io };
+
+// --- Graceful Shutdown ---
+function cleanupAndExit() {
+  console.log("\nFahre Server herunter... Beende alle Räume und Streams.");
+  for (const [code, room] of rooms.entries()) {
+    if (room.streamer && room.streamer.proc) {
+      console.log(`Beende FFmpeg für Raum ${code}...`);
+      room.streamer.stop();
+    }
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT', cleanupAndExit);
+process.on('SIGTERM', cleanupAndExit);

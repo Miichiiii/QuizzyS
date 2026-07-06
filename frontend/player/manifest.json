@@ -1,0 +1,10 @@
+{
+  "name": "QuizCast Player",
+  "short_name": "QuizCast",
+  "description": "Dein 8-Bit Party-Quiz Buzzer",
+  "start_url": "./",
+  "display": "fullscreen",
+  "background_color": "#101828",
+  "theme_color": "#101828",
+  "orientation": "portrait"
+}

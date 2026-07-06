@@ -33,6 +33,7 @@ const SCOREBOARD_MS = parseInt(process.env.SCOREBOARD_MS || "3000", 10);
 const RECONNECT_TIMEOUT_MS = parseInt(process.env.RECONNECT_TIMEOUT_MS || "60000", 10);
 const QUESTIONS_PER_GAME = 5;
 
+const AVATARS = ['🦖', '👻', '👾', '🤖', '🍄', '⭐', '🦊', '🐙', '🐵', '🐸'];
 const COLORS = ["blau", "rot", "gruen", "gelb", "orange", "pink", "violett", "cyan", "braun", "weiss"];
 
 class GameRoom {
@@ -277,9 +278,14 @@ class GameRoom {
 
       let remaining = q.timeLimit;
       this.broadcast("timer_tick", { remaining });
+      this.broadcastTv("tv_timer", { remaining });
+      this.streamer.updateCountdown(remaining);
+      
       this.tickInterval = setInterval(() => {
         remaining--;
         this.broadcast("timer_tick", { remaining });
+        this.broadcastTv("tv_timer", { remaining });
+        this.streamer.updateCountdown(remaining);
         if (remaining <= 0) this.lockAndReveal();
       }, 1000);
     }, STREAM_DELAY);
